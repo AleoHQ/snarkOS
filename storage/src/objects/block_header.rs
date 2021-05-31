@@ -64,29 +64,35 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         // Start from the latest block and work backwards
         let mut index = self.get_current_block_height();
 
-        // Update the step size with each iteration
-        let mut step = 1;
+        // The number of "chunks" into which the height is to be divided after the quadratic
+        // step used initially grows too high.
+        let divisor = std::cmp::min(16u32, std::cmp::max(index, 1));
+
+        // Two different steps used to seek further hashes: a quadratic one and a proportional one.
+        let mut quadratic_step = 4;
+        let mut proportional_step = index / divisor;
+        let mut proportional_step_updated = false;
 
         // The output list of block locator hashes
         let mut block_locator_hashes = vec![];
 
         while index > 0 {
             block_locator_hashes.push(self.get_block_hash(index)?);
-            if block_locator_hashes.len() >= 20 {
-                step *= 2;
-            }
 
-            // Check whether it is appropriate to terminate
-            if index < step {
-                // If the genesis block has not already been include, add it to the final output
-                if index != 1 {
-                    block_locator_hashes.push(self.get_block_hash(0)?);
+            // Start by using quadratic steps.
+            if proportional_step > quadratic_step {
+                index = index.saturating_sub(quadratic_step);
+                quadratic_step *= 2;
+            } else {
+                // Update the proportional step and use it from now on.
+                if !proportional_step_updated {
+                    proportional_step_updated = true;
+                    proportional_step = index / divisor;
                 }
-                break;
+                index = index.saturating_sub(proportional_step);
             }
-
-            index -= step;
         }
+        block_locator_hashes.push(self.get_block_hash(0)?);
 
         Ok(block_locator_hashes)
     }
