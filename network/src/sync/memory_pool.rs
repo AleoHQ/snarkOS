@@ -16,8 +16,8 @@
 
 use crate::{message::*, NetworkError, Node};
 use snarkos_consensus::memory_pool::Entry;
+use snarkos_storage::Storage;
 use snarkvm_dpc::base_dpc::instantiated::Tx;
-use snarkvm_objects::Storage;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -25,7 +25,7 @@ use snarkvm_utilities::{
 
 use std::net::SocketAddr;
 
-impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
+impl<S: Storage> Node<S> {
     ///
     /// Triggers the memory pool sync with a selected peer.
     ///
@@ -74,7 +74,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let insertion = {
                 let storage = self.expect_sync().storage();
 
-                if !self.expect_sync().consensus.verify_transaction(&tx)? {
+                if !self.expect_sync().consensus.verify_transaction(&tx).await? {
                     error!("Received a transaction that was invalid");
                     return Ok(());
                 }
@@ -155,6 +155,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         debug!("Storing memory pool transactions in database");
         memory_pool
             .store(&storage)
+            .await
             .unwrap_or_else(|error| debug!("Failed to store memory pool transaction in database {}", error));
 
         Ok(())

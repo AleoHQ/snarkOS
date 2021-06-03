@@ -14,27 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
+use crate::{DatabaseTransaction, Op, Storage, StorageError, *};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{
-    Block,
-    BlockError,
-    BlockHeader,
-    BlockHeaderHash,
-    DatabaseTransaction,
-    Op,
-    Storage,
-    StorageError,
-    Transaction,
-};
+use snarkvm_objects::{Block, BlockError, BlockHeader, BlockHeaderHash, Transaction};
 use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
 
 use std::sync::atomic::Ordering;
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: Transaction + Send + 'static, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Commit a transaction to the canon chain
     #[allow(clippy::type_complexity)]
-    pub(crate) fn commit_transaction(
+    pub(crate) async fn commit_transaction(
         &self,
         sn_index: &mut usize,
         cm_index: &mut usize,
@@ -49,7 +39,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
 
         for sn in old_serial_numbers {
             let sn_bytes = to_bytes![sn]?;
-            if self.get_sn_index(&sn_bytes)?.is_some() {
+            if self.get_sn_index(&sn_bytes).await?.is_some() {
                 return Err(StorageError::ExistingSn(sn_bytes.to_vec()));
             }
 
@@ -63,7 +53,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
 
         for cm in new_commitments {
             let cm_bytes = to_bytes![cm]?;
-            if self.get_cm_index(&cm_bytes)?.is_some() {
+            if self.get_cm_index(&cm_bytes).await?.is_some() {
                 return Err(StorageError::ExistingCm(cm_bytes.to_vec()));
             }
 
@@ -78,7 +68,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         }
 
         let memo_bytes = to_bytes![transaction.memorandum()]?;
-        if self.get_memo_index(&memo_bytes)?.is_some() {
+        if self.get_memo_index(&memo_bytes).await?.is_some() {
             return Err(StorageError::ExistingMemo(memo_bytes.to_vec()));
         } else {
             ops.push(Op::Insert {
@@ -93,11 +83,11 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Insert a block into storage without canonizing/committing it.
-    pub fn insert_only(&self, block: &Block<T>) -> Result<(), StorageError> {
+    pub async fn insert_only(&self, block: &Block<T>) -> Result<(), StorageError> {
         let block_hash = block.header.get_hash();
 
         // Check that the block does not already exist.
-        if self.block_hash_exists(&block_hash) {
+        if self.block_hash_exists(&block_hash).await {
             return Err(StorageError::BlockError(BlockError::BlockExists(
                 block_hash.to_string(),
             )));
@@ -155,7 +145,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             value: to_bytes![block.transactions]?.to_vec(),
         });
 
-        let mut child_hashes = self.get_child_block_hashes(&block.header.previous_block_hash)?;
+        let mut child_hashes = self.get_child_block_hashes(&block.header.previous_block_hash).await?;
 
         if !child_hashes.contains(&block_hash) {
             child_hashes.push(block_hash);
@@ -173,17 +163,17 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             value: to_bytes![block.transactions]?.to_vec(),
         });
 
-        self.storage.batch(database_transaction)?;
+        self.storage.batch(database_transaction).await?;
 
         Ok(())
     }
 
     /// Commit/canonize a particular block.
-    pub fn commit(&self, block: &Block<T>) -> Result<(), StorageError> {
+    pub async fn commit(&self, block: &Block<T>) -> Result<(), StorageError> {
         let block_header_hash = block.header.get_hash();
 
         // Check if the block is already in the canon chain
-        if self.is_canon(&block_header_hash) {
+        if self.is_canon(&block_header_hash).await {
             return Err(StorageError::ExistingCanonBlock(block_header_hash.to_string()));
         }
 
@@ -216,16 +206,17 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             return Err(StorageError::DuplicateMemo);
         }
 
-        let mut sn_index = self.current_sn_index()?;
-        let mut cm_index = self.current_cm_index()?;
-        let mut memo_index = self.current_memo_index()?;
+        let mut sn_index = self.current_sn_index().await?;
+        let mut cm_index = self.current_cm_index().await?;
+        let mut memo_index = self.current_memo_index().await?;
 
         // Process the individual transactions
-
         let mut transaction_cms = vec![];
 
         for transaction in block.transactions.0.iter() {
-            let (tx_ops, cms) = self.commit_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)?;
+            let (tx_ops, cms) = self
+                .commit_transaction(&mut sn_index, &mut cm_index, &mut memo_index, transaction)
+                .await?;
             database_transaction.push_vec(tx_ops);
             transaction_cms.extend(cms);
         }
@@ -253,7 +244,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         let height = self.get_current_block_height();
 
         let is_genesis =
-            block.header.previous_block_hash == BlockHeaderHash([0u8; 32]) && height == 0 && self.is_empty();
+            block.header.previous_block_hash == BlockHeaderHash([0u8; 32]) && height == 0 && self.is_empty().await;
 
         let mut new_best_block_number = 0;
         if !is_genesis {
@@ -280,7 +271,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         });
 
         // Rebuild the new commitment merkle tree
-        self.rebuild_merkle_tree(transaction_cms)?;
+        self.rebuild_merkle_tree(transaction_cms).await?;
         let tree = self.cm_merkle_tree.load();
         let new_digest = tree.root();
 
@@ -295,7 +286,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             value: to_bytes![new_digest]?.to_vec(),
         });
 
-        self.storage.batch(database_transaction)?;
+        self.storage.batch(database_transaction).await?;
 
         if !is_genesis {
             self.current_block_height.fetch_add(1, Ordering::SeqCst);
@@ -305,36 +296,36 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Insert a block into the storage and commit as part of the longest chain.
-    pub fn insert_and_commit(&self, block: &Block<T>) -> Result<(), StorageError> {
+    pub async fn insert_and_commit(&self, block: &Block<T>) -> Result<(), StorageError> {
         let block_hash = block.header.get_hash();
 
         // If the block does not exist in the storage
-        if !self.block_hash_exists(&block_hash) {
+        if !self.block_hash_exists(&block_hash).await {
             // Insert it first
-            self.insert_only(&block)?;
+            self.insert_only(&block).await?;
         }
         // Commit it
-        self.commit(block)
+        self.commit(block).await
     }
 
     /// Returns true if the block exists in the canon chain.
-    pub fn is_canon(&self, block_hash: &BlockHeaderHash) -> bool {
-        self.block_hash_exists(block_hash) && self.get_block_number(block_hash).is_ok()
+    pub async fn is_canon(&self, block_hash: &BlockHeaderHash) -> bool {
+        self.block_hash_exists(block_hash).await && self.get_block_number(block_hash).await.is_ok()
     }
 
     /// Returns true if the block corresponding to this block's previous_block_hash is in the canon chain.
-    pub fn is_previous_block_canon(&self, block_header: &BlockHeader) -> bool {
-        self.is_canon(&block_header.previous_block_hash)
+    pub async fn is_previous_block_canon(&self, block_header: &BlockHeader) -> bool {
+        self.is_canon(&block_header.previous_block_hash).await
     }
 
     /// Revert the chain to the state before the fork.
-    pub fn revert_for_fork(&self, side_chain_path: &SideChainPath) -> Result<(), StorageError> {
+    pub async fn revert_for_fork(&self, side_chain_path: &SideChainPath) -> Result<(), StorageError> {
         let current_block_height = self.get_current_block_height();
 
         if side_chain_path.new_block_number > current_block_height {
             // Decommit all blocks on canon chain up to the shared block number with the side chain.
             for _ in (side_chain_path.shared_block_number)..current_block_height {
-                self.decommit_latest_block()?;
+                self.decommit_latest_block().await?;
             }
         }
 

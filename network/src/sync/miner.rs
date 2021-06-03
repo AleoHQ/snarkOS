@@ -17,8 +17,8 @@
 use crate::{stats, Node, State};
 use futures::executor::block_on;
 use snarkos_consensus::Miner;
+use snarkos_storage::Storage;
 use snarkvm_dpc::{base_dpc::instantiated::*, AccountAddress};
-use snarkvm_objects::Storage;
 
 use tokio::task;
 use tracing::*;
@@ -26,12 +26,12 @@ use tracing::*;
 use std::{sync::Arc, thread, time::Duration};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
-pub struct MinerInstance<S: Storage + core::marker::Sync + Send + 'static> {
+pub struct MinerInstance<S: Storage> {
     miner_address: AccountAddress<Components>,
     node: Node<S>,
 }
 
-impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
+impl<S: Storage> MinerInstance<S> {
     /// Creates a new MinerInstance for spawning miners.
     pub fn new(miner_address: AccountAddress<Components>, node: Node<S>) -> Self {
         Self { miner_address, node }

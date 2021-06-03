@@ -22,9 +22,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::error::ConsensusError;
 use mpmc_map::MpmcMap;
-use snarkos_storage::Ledger;
+use snarkos_storage::{Ledger, Storage};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{dpc::DPCTransactions, BlockHeader, LedgerScheme, Storage, Transaction};
+use snarkvm_objects::{dpc::DPCTransactions, BlockHeader, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
@@ -73,7 +73,7 @@ impl<T: Transaction + Send + Sync + 'static> MemoryPool<T> {
     ) -> Result<Self, ConsensusError> {
         let memory_pool = Self::new();
 
-        if let Ok(Some(serialized_transactions)) = storage.get_memory_pool() {
+        if let Ok(Some(serialized_transactions)) = storage.get_memory_pool().await {
             if let Ok(transaction_bytes) = DPCTransactions::<T>::read(&serialized_transactions[..]) {
                 for transaction in transaction_bytes.0 {
                     let size = transaction.size();
@@ -91,7 +91,7 @@ impl<T: Transaction + Send + Sync + 'static> MemoryPool<T> {
 
     /// Store the memory pool state to the database
     #[inline]
-    pub fn store<P: LoadableMerkleParameters, S: Storage>(
+    pub async fn store<P: LoadableMerkleParameters, S: Storage>(
         &self,
         storage: &Ledger<T, P, S>,
     ) -> Result<(), ConsensusError> {
@@ -103,7 +103,7 @@ impl<T: Transaction + Send + Sync + 'static> MemoryPool<T> {
 
         let serialized_transactions = to_bytes![transactions]?.to_vec();
 
-        storage.store_to_memory_pool(serialized_transactions)?;
+        storage.store_to_memory_pool(serialized_transactions).await?;
 
         Ok(())
     }
@@ -137,18 +137,18 @@ impl<T: Transaction + Send + Sync + 'static> MemoryPool<T> {
         }
 
         for sn in transaction_serial_numbers {
-            if storage.contains_sn(sn) || holding_serial_numbers.contains(&sn) {
+            if storage.contains_sn(sn).await || holding_serial_numbers.contains(&sn) {
                 return Ok(None);
             }
         }
 
         for cm in transaction_commitments {
-            if storage.contains_cm(cm) || holding_commitments.contains(&cm) {
+            if storage.contains_cm(cm).await || holding_commitments.contains(&cm) {
                 return Ok(None);
             }
         }
 
-        if storage.contains_memo(transaction_memo) || holding_memos.contains(&transaction_memo) {
+        if storage.contains_memo(transaction_memo).await || holding_memos.contains(&transaction_memo) {
             return Ok(None);
         }
 
@@ -225,7 +225,7 @@ impl<T: Transaction + Send + Sync + 'static> MemoryPool<T> {
     }
 
     /// Get candidate transactions for a new block.
-    pub fn get_candidates<P: LoadableMerkleParameters, S: Storage>(
+    pub async fn get_candidates<P: LoadableMerkleParameters, S: Storage>(
         &self,
         storage: &Ledger<T, P, S>,
         max_size: usize,
@@ -238,7 +238,8 @@ impl<T: Transaction + Send + Sync + 'static> MemoryPool<T> {
         // TODO Change naive transaction selection
         for (_transaction_id, entry) in self.transactions.inner().iter() {
             if block_size + entry.size_in_bytes <= max_size {
-                if storage.transaction_conflicts(&entry.transaction) || transactions.conflicts(&entry.transaction) {
+                if storage.transaction_conflicts(&entry.transaction).await || transactions.conflicts(&entry.transaction)
+                {
                     continue;
                 }
 
@@ -271,7 +272,7 @@ mod tests {
 
     #[tokio::test]
     async fn push() {
-        let blockchain = FIXTURE_VK.ledger();
+        let blockchain = FIXTURE_VK.ledger().await;
 
         let mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
@@ -304,7 +305,7 @@ mod tests {
 
     #[tokio::test]
     async fn remove_entry() {
-        let blockchain = FIXTURE_VK.ledger();
+        let blockchain = FIXTURE_VK.ledger().await;
 
         let mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
@@ -328,7 +329,7 @@ mod tests {
 
     #[tokio::test]
     async fn remove_transaction_by_hash() {
-        let blockchain = FIXTURE_VK.ledger();
+        let blockchain = FIXTURE_VK.ledger().await;
 
         let mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
@@ -356,7 +357,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_candidates() {
-        let blockchain = FIXTURE_VK.ledger();
+        let blockchain = FIXTURE_VK.ledger().await;
 
         let mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
@@ -381,7 +382,7 @@ mod tests {
 
     #[tokio::test]
     async fn store_memory_pool() {
-        let blockchain = FIXTURE_VK.ledger();
+        let blockchain = FIXTURE_VK.ledger().await;
 
         let mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();
@@ -407,7 +408,7 @@ mod tests {
 
     #[tokio::test]
     async fn cleanse_memory_pool() {
-        let blockchain = FIXTURE_VK.ledger();
+        let blockchain = FIXTURE_VK.ledger().await;
 
         let mem_pool = MemoryPool::new();
         let transaction = Tx::read(&TRANSACTION_2[..]).unwrap();

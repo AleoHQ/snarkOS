@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{error::ConsensusError, ConsensusParameters, MemoryPool, MerkleTreeLedger, Tx};
-use snarkos_storage::BlockPath;
+use crate::{error::ConsensusError, CompatMerkleTreeLedger, ConsensusParameters, MemoryPool, MerkleTreeLedger, Tx};
+use snarkos_storage::{BlockPath, LedgerSchemeCompat, Storage};
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     instantiated::{Components, InstantiatedDPC, SerialNumberNonce, NUM_OUTPUT_RECORDS},
@@ -28,8 +28,9 @@ use snarkvm_dpc::{
     DPCRecord,
     DPCScheme,
     PublicParameters,
+    TransactionKernel,
 };
-use snarkvm_objects::{AleoAmount, Block, DPCTransactions, LedgerScheme, Storage};
+use snarkvm_objects::{AleoAmount, Block, DPCTransactions};
 use snarkvm_posw::txids_to_roots;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
@@ -46,7 +47,7 @@ pub struct Consensus<S: Storage> {
 
 impl<S: Storage> Consensus<S> {
     /// Check if the transaction is valid.
-    pub fn verify_transaction(&self, transaction: &Tx) -> Result<bool, ConsensusError> {
+    pub async fn verify_transaction(&self, transaction: &Tx) -> Result<bool, ConsensusError> {
         if !self
             .parameters
             .authorized_inner_snark_ids
@@ -55,41 +56,38 @@ impl<S: Storage> Consensus<S> {
             return Ok(false);
         }
 
-        Ok(InstantiatedDPC::verify(
-            &self.public_parameters,
-            transaction,
-            &*self.ledger,
-        )?)
+        let parameters = self.public_parameters.clone();
+        let ledger = self.ledger.clone();
+        let transaction = transaction.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            InstantiatedDPC::verify(&parameters, &transaction, &LedgerSchemeCompat(ledger))
+        })
+        .await
+        .expect("verify task panicked")?;
+        Ok(result)
     }
 
     /// Check if the transactions are valid.
-    pub fn verify_transactions(&self, transactions: &[Tx]) -> Result<bool, ConsensusError> {
+    pub async fn verify_transactions(&self, transactions: &[Tx]) -> Result<bool, ConsensusError> {
         for tx in transactions {
-            if !self
-                .parameters
-                .authorized_inner_snark_ids
-                .contains(&to_bytes![tx.inner_circuit_id]?)
-            {
+            debug!("verifying: {:?}", tx);
+            if !self.verify_transaction(tx).await? {
                 return Ok(false);
             }
         }
 
-        Ok(InstantiatedDPC::verify_transactions(
-            &self.public_parameters,
-            transactions,
-            &*self.ledger,
-        )?)
+        Ok(true)
     }
 
     /// Check if the block is valid.
     /// Verify transactions and transaction fees.
-    pub fn verify_block(&self, block: &Block<Tx>) -> Result<bool, ConsensusError> {
+    pub async fn verify_block(&self, block: &Block<Tx>) -> Result<bool, ConsensusError> {
         let transaction_ids: Vec<_> = block.transactions.to_transaction_ids()?;
         let (merkle_root, pedersen_merkle_root, _) = txids_to_roots(&transaction_ids);
 
         // Verify the block header
         if !crate::is_genesis(&block.header) {
-            let parent_block = self.ledger.get_latest_block()?;
+            let parent_block = self.ledger.get_latest_block().await?;
             if let Err(err) =
                 self.parameters
                     .verify_header(&block.header, &parent_block.header, &merkle_root, &pedersen_merkle_root)
@@ -120,7 +118,7 @@ impl<S: Storage> Consensus<S> {
         }
 
         // Check that the block value balances are correct
-        let expected_block_reward = crate::get_block_reward(self.ledger.len() as u32).0;
+        let expected_block_reward = crate::get_block_reward(self.ledger.get_current_block_height()).0;
         if total_value_balance.0 + expected_block_reward != 0 {
             trace!("total_value_balance: {:?}", total_value_balance);
             trace!("expected_block_reward: {:?}", expected_block_reward);
@@ -129,26 +127,28 @@ impl<S: Storage> Consensus<S> {
         }
 
         // Check that all the transaction proofs verify
-        self.verify_transactions(&block.transactions.0)
+        self.verify_transactions(&block.transactions.0).await
     }
 
     /// Receive a block from an external source and process it based on ledger state.
     pub async fn receive_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
         // Block is an unknown orphan
-        if !self.ledger.previous_block_hash_exists(block) && !self.ledger.is_previous_block_canon(&block.header) {
+        if !self.ledger.previous_block_hash_exists(block).await
+            && !self.ledger.is_previous_block_canon(&block.header).await
+        {
             debug!("Processing a block that is an unknown orphan");
 
             // There are two possible cases for an unknown orphan.
             // 1) The block is a genesis block, or
             // 2) The block is unknown and does not correspond with the canon chain.
-            if crate::is_genesis(&block.header) && self.ledger.is_empty() {
+            if crate::is_genesis(&block.header) && self.ledger.is_empty().await {
                 self.process_block(&block).await?;
             } else {
-                self.ledger.insert_only(block)?;
+                self.ledger.insert_only(block).await?;
             }
         } else {
             // If the block is not an unknown orphan, find the origin of the block
-            match self.ledger.get_block_path(&block.header)? {
+            match self.ledger.get_block_path(&block.header).await? {
                 BlockPath::ExistingBlock => {
                     debug!("Received a pre-existing block");
                     return Err(ConsensusError::PreExistingBlock);
@@ -160,9 +160,11 @@ impl<S: Storage> Consensus<S> {
 
                     // Attempt to fast forward the block state if the node already stores
                     // the children of the new canon block.
-                    let (_, child_path) = self.ledger.longest_child_path(block.header.get_hash())?;
+                    let (_, child_path) =
+                        MerkleTreeLedger::<S>::longest_child_path(self.ledger.storage.clone(), block.header.get_hash())
+                            .await?;
                     for child_block_hash in child_path {
-                        let new_block = self.ledger.get_block(&child_block_hash)?;
+                        let new_block = self.ledger.get_block(&child_block_hash).await?;
                         self.process_block(&new_block).await?;
                     }
                 }
@@ -182,21 +184,21 @@ impl<S: Storage> Consensus<S> {
                         warn!("A valid fork has been detected. Performing a fork to the side chain.");
 
                         // Fork to superior side chain
-                        self.ledger.revert_for_fork(&side_chain_path)?;
+                        self.ledger.revert_for_fork(&side_chain_path).await?;
 
                         if !side_chain_path.path.is_empty() {
                             for block_hash in side_chain_path.path {
                                 if block_hash == block.header.get_hash() {
                                     self.process_block(&block).await?
                                 } else {
-                                    let new_block = self.ledger.get_block(&block_hash)?;
+                                    let new_block = self.ledger.get_block(&block_hash).await?;
                                     self.process_block(&new_block).await?;
                                 }
                             }
                         }
                     } else {
                         // If the sidechain is not longer than the main canon chain, simply store the block
-                        self.ledger.insert_only(block)?;
+                        self.ledger.insert_only(block).await?;
                     }
                 }
             };
@@ -210,17 +212,17 @@ impl<S: Storage> Consensus<S> {
     /// 2. Verify that the transactions are valid.
     /// 3. Insert/canonize block.
     pub async fn process_block(&self, block: &Block<Tx>) -> Result<(), ConsensusError> {
-        if self.ledger.is_canon(&block.header.get_hash()) {
+        if self.ledger.is_canon(&block.header.get_hash()).await {
             return Ok(());
         }
 
         // 1. Verify that the block valid
-        if !self.verify_block(block)? {
+        if !self.verify_block(block).await? {
             return Err(ConsensusError::InvalidBlock(block.header.get_hash().0.to_vec()));
         }
 
         // 2. Insert/canonize block
-        self.ledger.insert_and_commit(block)?;
+        self.ledger.insert_and_commit(block).await?;
 
         // 3. Remove transactions from the mempool
         for transaction_id in block.transactions.to_transaction_ids()? {
@@ -232,7 +234,7 @@ impl<S: Storage> Consensus<S> {
 
     /// Generate a transaction by spending old records and specifying new record attributes
     #[allow(clippy::too_many_arguments)]
-    pub fn create_transaction<R: Rng>(
+    pub async fn create_transaction<R: Rng + Send + 'static>(
         &self,
         old_records: Vec<DPCRecord<Components>>,
         old_account_private_keys: Vec<AccountPrivateKey<Components>>,
@@ -243,10 +245,10 @@ impl<S: Storage> Consensus<S> {
         new_values: Vec<u64>,
         new_payloads: Vec<RecordPayload>,
         memo: [u8; 32],
-        rng: &mut R,
+        mut rng: R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         // Offline execution to generate a DPC transaction
-        let transaction_kernel = <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::execute_offline(
+        let transaction_kernel = <InstantiatedDPC as DPCScheme<CompatMerkleTreeLedger<S>>>::execute_offline(
             self.public_parameters.system_parameters.clone(),
             old_records,
             old_account_private_keys,
@@ -258,29 +260,48 @@ impl<S: Storage> Consensus<S> {
             new_death_program_ids,
             memo,
             self.parameters.network_id.id(),
-            rng,
+            &mut rng,
         )?;
 
+        self.execute_transaction(transaction_kernel, rng).await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn execute_transaction<R: Rng + Send + 'static>(
+        &self,
+        transaction_kernel: TransactionKernel<Components>,
+        mut rng: R,
+    ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         // Construct the program proofs
-        let (old_death_program_proofs, new_birth_program_proofs) =
-            ConsensusParameters::generate_program_proofs::<R, S>(&self.public_parameters, &transaction_kernel, rng)?;
+        let (old_death_program_proofs, new_birth_program_proofs) = ConsensusParameters::generate_program_proofs::<R, S>(
+            &self.public_parameters,
+            &transaction_kernel,
+            &mut rng,
+        )?;
 
         // Online execution to generate a DPC transaction
-        let (new_records, transaction) = InstantiatedDPC::execute_online(
-            &self.public_parameters,
-            transaction_kernel,
-            old_death_program_proofs,
-            new_birth_program_proofs,
-            &*self.ledger,
-            rng,
-        )?;
+        let ledger = self.ledger.clone();
+        let parameters = self.public_parameters.clone();
+
+        let (new_records, transaction) = tokio::task::spawn_blocking(move || {
+            InstantiatedDPC::execute_online(
+                &parameters,
+                transaction_kernel,
+                old_death_program_proofs,
+                new_birth_program_proofs,
+                &LedgerSchemeCompat(ledger),
+                &mut rng,
+            )
+        })
+        .await
+        .expect("execute_online task panicked")?;
 
         Ok((new_records, transaction))
     }
 
     /// Generate a coinbase transaction given candidate block transactions
     #[allow(clippy::too_many_arguments)]
-    pub fn create_coinbase_transaction<R: Rng>(
+    pub async fn create_coinbase_transaction<R: Rng + Send + 'static>(
         &self,
         block_num: u32,
         transactions: &DPCTransactions<Tx>,
@@ -288,7 +309,7 @@ impl<S: Storage> Consensus<S> {
         new_birth_program_ids: Vec<Vec<u8>>,
         new_death_program_ids: Vec<Vec<u8>>,
         recipient: AccountAddress<Components>,
-        rng: &mut R,
+        mut rng: R,
     ) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
         let mut total_value_balance = crate::get_block_reward(block_num);
 
@@ -307,7 +328,7 @@ impl<S: Storage> Consensus<S> {
             &self.public_parameters.system_parameters.account_signature,
             &self.public_parameters.system_parameters.account_commitment,
             &self.public_parameters.system_parameters.account_encryption,
-            rng,
+            &mut rng,
         )
         .unwrap();
 
@@ -332,7 +353,7 @@ impl<S: Storage> Consensus<S> {
                 // Filler program input
                 program_vk_hash.clone(),
                 program_vk_hash.clone(),
-                rng,
+                &mut rng,
             )?;
 
             old_records.push(old_record);
@@ -362,5 +383,6 @@ impl<S: Storage> Consensus<S> {
             memo,
             rng,
         )
+        .await
     }
 }

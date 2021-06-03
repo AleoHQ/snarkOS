@@ -23,7 +23,7 @@ use crate::{
 };
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_network::Node;
-use snarkvm_objects::Storage;
+use snarkos_storage::Storage;
 
 use jsonrpc_http_server::{cors::AccessControlAllowHeaders, hyper, ServerBuilder};
 use tokio::task;
@@ -34,7 +34,7 @@ use std::{net::SocketAddr, sync::Arc};
 /// Rpc failures will error on the thread level but not affect the main network server.
 /// This may be changed in the future to give the node more control of the rpc server.
 #[allow(clippy::too_many_arguments)]
-pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
+pub fn start_rpc_server<S: Storage>(
     rpc_addr: SocketAddr,
     secondary_storage: Arc<MerkleTreeLedger<S>>,
     node_server: Node<S>,

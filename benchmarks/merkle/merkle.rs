@@ -45,10 +45,48 @@ fn merkle_build(c: &mut Criterion) {
     });
 }
 
+fn merkle_rebuild<const N: usize>(c: &mut Criterion) {
+    let crh_parameters =
+        <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
+            .expect("read bytes as hash for MerkleParameters in ledger");
+    let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
+    let ledger_merkle_tree_parameters: Arc<CommitmentMerkleParameters> =
+        Arc::new(From::from(merkle_tree_hash_parameters));
+
+    let mut commitments = Vec::with_capacity(10000);
+    for _ in 0..10000 {
+        let mut buf = [0u8; 32];
+        rand::thread_rng().fill(&mut buf[..]);
+        commitments.push(buf);
+    }
+
+    let mut recommitments = Vec::with_capacity(N);
+    for _ in 0..N {
+        let mut buf = [0u8; 32];
+        rand::thread_rng().fill(&mut buf[..]);
+        recommitments.push(buf);
+    }
+
+    let tree = MerkleTree::new(ledger_merkle_tree_parameters.clone(), &commitments[..]).unwrap();
+    c.bench_function(&*format!("merkle_rebuild::<{}>", N), move |b| {
+        b.iter(|| {
+            let tree = tree.clone();
+            let recommitments = recommitments.iter().collect::<Vec<_>>();
+            tree.rebuild(commitments.iter(), &recommitments[..]).unwrap();
+        });
+    });
+}
+
 criterion_group! {
-    name = merkle;
+    name = merkle_build_group;
     config = Criterion::default().sample_size(10);
     targets = merkle_build
 }
 
-criterion_main!(merkle);
+criterion_group! {
+    name = merkle_rebuild_group;
+    config = Criterion::default().sample_size(10);
+    targets = merkle_rebuild::<10000>, merkle_rebuild::<10>
+}
+
+criterion_main!(merkle_rebuild_group, merkle_build_group);

@@ -14,60 +14,138 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::NUM_COLS;
-use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage};
+use crate::{AtomicTransaction, DatabaseTransaction, Op, Storage, StorageError, SyncStorage, NUM_COLS};
 
 use rocksdb::{ColumnFamily, ColumnFamilyDescriptor, IteratorMode, Options, WriteBatch, DB};
-use std::path::Path;
+use std::{any::Any, path::Path};
+use tokio::sync::{mpsc, oneshot};
 
 fn convert_err(err: rocksdb::Error) -> StorageError {
     StorageError::Crate("rocksdb", err.to_string())
 }
 
+#[derive(Clone)]
 pub struct RocksDb {
-    db: Option<DB>, // the option is only for Drop (destroy) purposes
-    cf_names: Vec<String>,
+    sender: mpsc::Sender<DbOperation>,
 }
 
-impl Storage for RocksDb {
-    const IN_MEMORY: bool = false;
+type AtomicTransactionDyn =
+    dyn FnOnce(&mut dyn SyncStorage) -> Result<Option<Box<dyn Any + Send>>, StorageError> + Send + Sync;
 
-    fn open(path: Option<&Path>, secondary_path: Option<&Path>) -> Result<Self, StorageError> {
-        assert!(path.is_some(), "RocksDB must have an associated filesystem path!");
-        let primary_path = path.unwrap();
+enum DbOperation {
+    Get {
+        col: u32,
+        key: Vec<u8>,
+        response: oneshot::Sender<Result<Option<Vec<u8>>, StorageError>>,
+    },
+    Exists {
+        col: u32,
+        key: Vec<u8>,
+        response: oneshot::Sender<Result<bool, StorageError>>,
+    },
+    GetCol {
+        col: u32,
+        response: oneshot::Sender<Result<Vec<(Box<[u8]>, Box<[u8]>)>, StorageError>>,
+    },
+    GetKeys {
+        col: u32,
+        response: oneshot::Sender<Result<Vec<Box<[u8]>>, StorageError>>,
+    },
+    Put {
+        col: u32,
+        key: Vec<u8>,
+        value: Vec<u8>,
+        response: oneshot::Sender<Result<(), StorageError>>,
+    },
+    Batch {
+        transaction: DatabaseTransaction,
+        response: oneshot::Sender<Result<(), StorageError>>,
+    },
+    Atomic {
+        operation: Box<AtomicTransactionDyn>,
+        response: oneshot::Sender<Result<Option<Box<dyn Any + Send>>, StorageError>>,
+    },
+}
 
-        if let Some(secondary_path) = secondary_path {
-            RocksDb::open_secondary_cf(primary_path, secondary_path, NUM_COLS)
-        } else {
-            RocksDb::open_cf(primary_path, NUM_COLS)
-        }
+struct RocksDbInner {
+    cf_names: Vec<String>,
+    db: DB,
+    receiver: mpsc::Receiver<DbOperation>,
+}
+
+impl RocksDbInner {
+    /// Returns the column family reference from a given index.
+    /// If the given index does not exist, returns [None](std::option::Option).
+    fn get_cf_ref(&self, index: u32) -> &ColumnFamily {
+        self.db
+            .cf_handle(&self.cf_names[index as usize])
+            .expect("the column family exists")
     }
 
+    fn thread(mut self) {
+        while let Some(received) = self.receiver.blocking_recv() {
+            match received {
+                DbOperation::Get { col, key, response } => {
+                    let result = self.get(col, &key[..]);
+                    response.send(result).ok();
+                }
+                DbOperation::Exists { col, key, response } => {
+                    let result = self.exists(col, &key[..]);
+                    response.send(result).ok();
+                }
+                DbOperation::GetCol { col, response } => {
+                    let result = self.get_col(col);
+                    response.send(result).ok();
+                }
+                DbOperation::GetKeys { col, response } => {
+                    let result = self.get_keys(col);
+                    response.send(result).ok();
+                }
+                DbOperation::Put {
+                    col,
+                    key,
+                    value,
+                    response,
+                } => {
+                    let result = self.put(col, &key[..], &value[..]);
+                    response.send(result).ok();
+                }
+                DbOperation::Batch { transaction, response } => {
+                    let result = self.batch(transaction);
+                    response.send(result).ok();
+                }
+                DbOperation::Atomic { operation, response } => {
+                    let result = operation(&mut self);
+                    response.send(result).ok();
+                }
+            }
+        }
+    }
+}
+
+impl SyncStorage for RocksDbInner {
     fn get(&self, col: u32, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
-        self.db().get_cf(self.get_cf_ref(col), key).map_err(convert_err)
+        self.db.get_cf(self.get_cf_ref(col), &key[..]).map_err(convert_err)
     }
 
     #[allow(clippy::type_complexity)]
     fn get_col(&self, col: u32) -> Result<Vec<(Box<[u8]>, Box<[u8]>)>, StorageError> {
-        Ok(self
-            .db()
-            .iterator_cf(self.get_cf_ref(col), IteratorMode::Start)
-            .collect())
+        Ok(self.db.iterator_cf(self.get_cf_ref(col), IteratorMode::Start).collect())
     }
 
     fn get_keys(&self, col: u32) -> Result<Vec<Box<[u8]>>, StorageError> {
         Ok(self
-            .db()
+            .db
             .iterator_cf(self.get_cf_ref(col), IteratorMode::Start)
             .map(|(k, _v)| k)
             .collect())
     }
 
-    fn put<K: AsRef<[u8]>, V: AsRef<[u8]>>(&self, col: u32, key: K, value: V) -> Result<(), StorageError> {
-        self.db().put_cf(self.get_cf_ref(col), key, value).map_err(convert_err)
+    fn put(&mut self, col: u32, key: &[u8], value: &[u8]) -> Result<(), StorageError> {
+        self.db.put_cf(self.get_cf_ref(col), key, value).map_err(convert_err)
     }
 
-    fn batch(&self, transaction: DatabaseTransaction) -> Result<(), StorageError> {
+    fn batch(&mut self, transaction: DatabaseTransaction) -> Result<(), StorageError> {
         let mut batch = WriteBatch::default();
 
         for operation in transaction.0 {
@@ -82,47 +160,127 @@ impl Storage for RocksDb {
                 }
             };
         }
-
-        self.db().write(batch).map_err(convert_err)?;
-
-        Ok(())
+        self.db.write(batch).map_err(convert_err)
     }
 
-    fn exists(&self, col: u32, key: &[u8]) -> bool {
-        match self.db().get_cf(self.get_cf_ref(col), key) {
-            Ok(val) => val.is_some(),
-            Err(_) => false,
-        }
-    }
-
-    fn try_catch_up_with_primary(&self) -> Result<(), StorageError> {
-        self.db()
-            .try_catch_up_with_primary()
-            .map_err(|e| StorageError::Message(format!("Can't catch up with primary storage: {}", e)))
-    }
-}
-
-impl Drop for RocksDb {
-    fn drop(&mut self) {
-        // as of rocksdb = 0.15, DB::drop must be called before DB::destroy
-        let db = self.db.take().unwrap();
-        let _path = db.path().to_path_buf();
-        drop(db);
-
-        // destroy the database in test conditions
-        #[cfg(feature = "test")]
-        {
-            let _ = DB::destroy(&Options::default(), _path);
-        }
+    fn exists(&self, col: u32, key: &[u8]) -> Result<bool, StorageError> {
+        self.db
+            .get_pinned_cf(self.get_cf_ref(col), &key[..])
+            .map_err(convert_err)
+            .map(|x| x.is_some())
     }
 }
 
 impl RocksDb {
-    fn db(&self) -> &DB {
-        // safe; always available, only Drop removes it
-        self.db.as_ref().unwrap()
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self, StorageError> {
+        RocksDb::open_cf(path, NUM_COLS)
+    }
+}
+
+fn stale_db<E>(_: E) -> StorageError {
+    StorageError::Message("stale db".to_string())
+}
+
+#[async_trait::async_trait]
+impl Storage for RocksDb {
+    async fn get(&self, col: u32, key: &[u8]) -> Result<Option<Vec<u8>>, StorageError> {
+        let (sender, receiver) = oneshot::channel();
+        self.sender
+            .send(DbOperation::Get {
+                col,
+                key: key.to_vec(),
+                response: sender,
+            })
+            .await
+            .map_err(stale_db)?;
+        receiver.await.map_err(stale_db)?
     }
 
+    #[allow(clippy::type_complexity)]
+    async fn get_col(&self, col: u32) -> Result<Vec<(Box<[u8]>, Box<[u8]>)>, StorageError> {
+        let (sender, receiver) = oneshot::channel();
+        self.sender
+            .send(DbOperation::GetCol { col, response: sender })
+            .await
+            .map_err(stale_db)?;
+        receiver.await.map_err(stale_db)?
+    }
+
+    async fn get_keys(&self, col: u32) -> Result<Vec<Box<[u8]>>, StorageError> {
+        let (sender, receiver) = oneshot::channel();
+        self.sender
+            .send(DbOperation::GetKeys { col, response: sender })
+            .await
+            .map_err(stale_db)?;
+        receiver.await.map_err(stale_db)?
+    }
+
+    async fn put<K: AsRef<[u8]> + Send, V: AsRef<[u8]> + Send>(
+        &self,
+        col: u32,
+        key: K,
+        value: V,
+    ) -> Result<(), StorageError> {
+        let (sender, receiver) = oneshot::channel();
+        let key = key.as_ref().to_vec();
+        let value = value.as_ref().to_vec();
+        self.sender
+            .send(DbOperation::Put {
+                col,
+                key,
+                value,
+                response: sender,
+            })
+            .await
+            .map_err(stale_db)?;
+        receiver.await.map_err(stale_db)?
+    }
+
+    async fn batch(&self, transaction: DatabaseTransaction) -> Result<(), StorageError> {
+        let (sender, receiver) = oneshot::channel();
+        self.sender
+            .send(DbOperation::Batch {
+                transaction,
+                response: sender,
+            })
+            .await
+            .map_err(stale_db)?;
+        receiver.await.map_err(stale_db)?
+    }
+
+    async fn exists(&self, col: u32, key: &[u8]) -> Result<bool, StorageError> {
+        let (sender, receiver) = oneshot::channel();
+        self.sender
+            .send(DbOperation::Exists {
+                col,
+                key: key.to_vec(),
+                response: sender,
+            })
+            .await
+            .map_err(stale_db)?;
+        receiver.await.map_err(stale_db)?
+    }
+
+    async fn atomic<T: Send + 'static>(
+        &self,
+        atomic: Box<AtomicTransaction<T>>,
+    ) -> Result<Option<Box<T>>, StorageError> {
+        let (sender, receiver) = oneshot::channel();
+        self.sender
+            .send(DbOperation::Atomic {
+                operation: Box::new(move |db| atomic(db).map(|a| a.map(|a| a as Box<dyn Any + Send + 'static>))),
+                response: sender,
+            })
+            .await
+            .map_err(stale_db)?;
+        receiver
+            .await
+            .map_err(stale_db)?
+            .map(|a| a.map(|a| a.downcast().unwrap()))
+    }
+}
+
+impl RocksDb {
     /// Opens storage from the given path with its given names. If storage does not exists,
     /// it creates a new storage file at the given path with its given names, and opens it.
     /// If RocksDB fails to open, returns [StorageError](snarkvm_errors::storage::StorageError).
@@ -147,43 +305,16 @@ impl RocksDb {
 
         let storage = DB::open_cf_descriptors(&storage_opts, path, cfs).map_err(convert_err)?;
 
-        Ok(Self {
-            db: Some(storage),
-            cf_names,
-        })
-    }
+        let (sender, receiver) = mpsc::channel(256);
+        std::thread::spawn(move || {
+            RocksDbInner {
+                receiver,
+                db: storage,
+                cf_names,
+            }
+            .thread();
+        });
 
-    /// Opens a secondary storage instance from the given path with its given names.
-    /// If RocksDB fails to open, returns [StorageError](snarkvm_errors::storage::StorageError).
-    pub fn open_secondary_cf<P: AsRef<Path> + Clone>(
-        primary_path: P,
-        secondary_path: P,
-        num_cfs: u32,
-    ) -> Result<Self, StorageError> {
-        let mut cf_names: Vec<String> = Vec::with_capacity(num_cfs as usize);
-        for column in 0..num_cfs {
-            let column_name = format!("col{}", column.to_string());
-            cf_names.push(column_name);
-        }
-        let mut storage_opts = Options::default();
-        storage_opts.increase_parallelism(2);
-
-        let storage = DB::open_cf_as_secondary(&storage_opts, primary_path, secondary_path, cf_names.clone())
-            .map_err(convert_err)?;
-
-        storage.try_catch_up_with_primary().map_err(convert_err)?;
-
-        Ok(Self {
-            db: Some(storage),
-            cf_names,
-        })
-    }
-
-    /// Returns the column family reference from a given index.
-    /// If the given index does not exist, returns [None](std::option::Option).
-    pub(crate) fn get_cf_ref(&self, index: u32) -> &ColumnFamily {
-        self.db()
-            .cf_handle(&self.cf_names[index as usize])
-            .expect("the column family exists")
+        Ok(Self { sender })
     }
 }

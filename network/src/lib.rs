@@ -85,7 +85,7 @@ pub const MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024; // 8MiB
 pub const SHARED_PEER_COUNT: usize = 25;
 
 /// The depth of the common inbound channel.
-pub const INBOUND_CHANNEL_DEPTH: usize = 16 * 1024;
+pub const INBOUND_CHANNEL_DEPTH: usize = 1024;
 /// The depth of the per-connection outbound channels.
 pub const OUTBOUND_CHANNEL_DEPTH: usize = 1024;
 

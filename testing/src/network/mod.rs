@@ -151,8 +151,8 @@ impl Default for TestSetup {
     }
 }
 
-pub fn test_consensus(setup: ConsensusSetup) -> Sync<LedgerStorage> {
-    let consensus = Arc::new(crate::sync::create_test_consensus());
+pub async fn test_consensus(setup: ConsensusSetup) -> Sync<LedgerStorage> {
+    let consensus = Arc::new(crate::sync::create_test_consensus().await);
 
     Sync::new(
         consensus,
@@ -182,7 +182,7 @@ pub async fn test_node(setup: TestSetup) -> Node<LedgerStorage> {
     let mut node = Node::new(config).await.unwrap();
 
     if let Some(consensus_setup) = setup.consensus_setup {
-        let consensus = test_consensus(consensus_setup);
+        let consensus = test_consensus(consensus_setup).await;
         node.set_sync(consensus);
     }
 

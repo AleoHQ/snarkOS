@@ -18,7 +18,7 @@ use anyhow::*;
 use chrono::Utc;
 use futures::{select, FutureExt};
 use serde::{Deserialize, Serialize};
-use snarkvm_objects::Storage;
+use snarkos_storage::Storage;
 use std::{net::SocketAddr, time::Duration};
 use tokio::sync::mpsc;
 
@@ -65,8 +65,7 @@ impl Peer {
 
     pub fn judge(&mut self) -> bool {
         let f = self.failures();
-        // self.quality.rtt_ms > 1500 ||
-        f >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
+        self.quality.rtt_ms > 1500 || f >= FAILURE_THRESHOLD || self.quality.is_inactive(chrono::Utc::now())
     }
 
     pub fn judge_offline(&mut self) -> bool {
@@ -103,7 +102,7 @@ impl Peer {
         Duration::from_secs(crate::HANDSHAKE_PEER_TIMEOUT_SECS as u64)
     }
 
-    pub(super) async fn run<S: Storage + Send + Sync + 'static>(
+    pub(super) async fn run<S: Storage>(
         &mut self,
         node: Node<S>,
         mut network: PeerNetwork,
@@ -167,5 +166,21 @@ impl Peer {
     pub(super) fn set_disconnected(&mut self) {
         self.quality.disconnected();
         self.status = PeerStatus::Disconnected;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_peer_failure_expiration() {
+        let mut peer = Peer::new("127.0.0.1:1111".parse().unwrap(), false);
+        peer.fail();
+        for _ in 0..3 {
+            peer.quality.failures.push(chrono::MIN_DATETIME);
+        }
+        peer.fail();
+        assert_eq!(peer.failures(), 2);
     }
 }

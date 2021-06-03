@@ -57,11 +57,12 @@ pub use memory_pool::MemoryPool;
 pub mod parameters;
 pub use parameters::*;
 
-use snarkos_storage::Ledger;
+use snarkos_storage::{Ledger, LedgerSchemeCompat};
 use snarkvm_dpc::base_dpc::instantiated::{CommitmentMerkleParameters, Tx};
 use snarkvm_objects::{AleoAmount, BlockHeader, BlockHeaderHash};
 
 pub type MerkleTreeLedger<S> = Ledger<Tx, CommitmentMerkleParameters, S>;
+pub type CompatMerkleTreeLedger<S> = LedgerSchemeCompat<Tx, CommitmentMerkleParameters, S>;
 
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
 pub fn get_block_reward(block_num: u32) -> AleoAmount {

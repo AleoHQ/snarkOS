@@ -27,7 +27,7 @@ use snarkvm_dpc::{
     Account,
     DPCScheme,
 };
-use snarkvm_objects::{Block, Storage};
+use snarkvm_objects::Block;
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
@@ -39,12 +39,12 @@ use rand::SeedableRng;
 use rand_xorshift::XorShiftRng;
 use std::sync::Arc;
 
-pub static FIXTURE: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(false));
-pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
+pub static FIXTURE: Lazy<Fixture> = Lazy::new(|| setup(false));
+pub static FIXTURE_VK: Lazy<Fixture> = Lazy::new(|| setup(true));
 
 // helper for setting up e2e tests
-pub struct Fixture<S: Storage> {
-    pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+pub struct Fixture {
+    pub parameters: <InstantiatedDPC as DPCScheme<CommitmentMerkleParameters>>::NetworkParameters,
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: Arc<CommitmentMerkleParameters>,
     pub genesis_block: Block<Tx>,
@@ -52,20 +52,20 @@ pub struct Fixture<S: Storage> {
     pub rng: XorShiftRng,
 }
 
-impl<S: Storage> Fixture<S> {
-    pub fn ledger(&self) -> MerkleTreeLedger<S> {
-        initialize_test_blockchain(self.ledger_parameters.clone(), self.genesis_block.clone())
+impl Fixture {
+    pub async fn ledger(&self) -> MerkleTreeLedger<LedgerStorage> {
+        initialize_test_blockchain(self.ledger_parameters.clone(), self.genesis_block.clone()).await
     }
 }
 
-fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
+fn setup(verify_only: bool) -> Fixture {
     let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (ledger_parameters, parameters) = setup_or_load_parameters::<_, S>(verify_only, &mut rng);
+    let (ledger_parameters, parameters) = setup_or_load_parameters(verify_only, &mut rng);
 
     // Generate addresses
-    let test_accounts = generate_test_accounts::<_, S>(&parameters, &mut rng);
+    let test_accounts = generate_test_accounts(&parameters, &mut rng);
 
     let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
 

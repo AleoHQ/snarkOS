@@ -135,8 +135,8 @@ impl FromBytes for TestTx {
     }
 }
 
-pub fn create_test_consensus() -> snarkos_consensus::Consensus<LedgerStorage> {
-    create_test_consensus_from_ledger(Arc::new(FIXTURE_VK.ledger()))
+pub async fn create_test_consensus() -> snarkos_consensus::Consensus<LedgerStorage> {
+    create_test_consensus_from_ledger(Arc::new(FIXTURE_VK.ledger().await))
 }
 
 pub fn create_test_consensus_from_ledger(

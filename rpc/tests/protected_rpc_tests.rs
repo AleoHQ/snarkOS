@@ -102,7 +102,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_authentication() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let meta = invalid_authentication();
         let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
@@ -118,7 +118,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_fetch_record_commitment_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
@@ -135,7 +135,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_fetch_record_commitments() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
@@ -156,7 +156,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_raw_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         storage.store_record(&DATA.records_1[0]).unwrap();
 
         let meta = authentication();
@@ -179,7 +179,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decode_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let meta = authentication();
         let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
@@ -219,7 +219,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decrypt_record() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let meta = authentication();
         let (rpc, _consensus) = initialize_test_rpc(storage).await;
 
@@ -264,7 +264,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_raw_transaction() {
-        let storage = Arc::new(FIXTURE.ledger());
+        let storage = Arc::new(FIXTURE.ledger().await);
         let meta = authentication();
 
         let (rpc, consensus) = initialize_test_rpc(storage).await;
@@ -316,7 +316,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_transaction_kernel() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let meta = authentication();
 
         let (rpc, consensus) = initialize_test_rpc(storage).await;
@@ -363,7 +363,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_create_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let meta = authentication();
 
         let (rpc, consensus) = initialize_test_rpc(storage).await;
@@ -401,7 +401,7 @@ mod protected_rpc_tests {
 
     #[tokio::test]
     async fn test_create_account() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let meta = authentication();
         let (rpc, _consensus) = initialize_test_rpc(storage).await;
 

@@ -117,6 +117,14 @@ impl Peer {
             }
             PeerAction::QualityJudgement => {
                 if self.judge() {
+                    let f = self.failures();
+                    debug!(
+                        "judgement results for {}: {} {} {}",
+                        self.address,
+                        self.quality.rtt_ms,
+                        f,
+                        self.quality.is_inactive(chrono::Utc::now())
+                    );
                     warn!("Peer {} has a low quality score; disconnecting.", self.address);
                     Ok(PeerResponse::Disconnect)
                 } else {

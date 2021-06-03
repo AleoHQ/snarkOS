@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{difficulty::bitcoin_retarget, error::ConsensusError, MerkleTreeLedger};
+use crate::{difficulty::bitcoin_retarget, error::ConsensusError, CompatMerkleTreeLedger};
 use snarkos_profiler::{end_timer, start_timer};
+use snarkos_storage::Storage;
 use snarkvm_algorithms::{CRH, SNARK};
 use snarkvm_curves::bls12_377::Bls12_377;
 use snarkvm_dpc::{
@@ -23,7 +24,7 @@ use snarkvm_dpc::{
     DPCScheme,
     Program,
 };
-use snarkvm_objects::{BlockHeader, MerkleRootHash, Network, PedersenMerkleRootHash, Storage};
+use snarkvm_objects::{BlockHeader, MerkleRootHash, Network, PedersenMerkleRootHash};
 use snarkvm_posw::{Marlin, PoswMarlin};
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
@@ -120,13 +121,13 @@ impl ConsensusParameters {
     /// Generate the birth and death program proofs for a transaction for a given transaction kernel
     #[allow(clippy::type_complexity)]
     pub fn generate_program_proofs<R: Rng, S: Storage>(
-        parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
-        transaction_kernel: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::TransactionKernel,
+        parameters: &<InstantiatedDPC as DPCScheme<CompatMerkleTreeLedger<S>>>::NetworkParameters,
+        transaction_kernel: &<InstantiatedDPC as DPCScheme<CompatMerkleTreeLedger<S>>>::TransactionKernel,
         rng: &mut R,
     ) -> Result<
         (
-            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>,
-            Vec<<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::PrivateProgramInput>,
+            Vec<<InstantiatedDPC as DPCScheme<CompatMerkleTreeLedger<S>>>::PrivateProgramInput>,
+            Vec<<InstantiatedDPC as DPCScheme<CompatMerkleTreeLedger<S>>>::PrivateProgramInput>,
         ),
         ConsensusError,
     > {

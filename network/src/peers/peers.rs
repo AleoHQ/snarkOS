@@ -15,21 +15,21 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{message::*, stats, NetworkError, Node};
-use snarkvm_objects::Storage;
+use snarkos_storage::Storage;
 
 use std::{cmp, net::SocketAddr, time::Duration};
 
 use rand::seq::IteratorRandom;
 use tokio::task;
 
-impl<S: Storage + core::marker::Sync + Send> Node<S> {
+impl<S: Storage> Node<S> {
     /// Obtain a list of addresses of connected peers for this node.
     pub(crate) fn connected_peers(&self) -> Vec<SocketAddr> {
         self.peer_book.connected_peers()
     }
 }
 
-impl<S: Storage + Send + Sync + 'static> Node<S> {
+impl<S: Storage> Node<S> {
     ///
     /// Broadcasts updates with connected peers and maintains a permitted number of connected peers.
     ///

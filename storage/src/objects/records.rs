@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::*;
+use crate::{DatabaseTransaction, Op, Storage, StorageError, *};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::Record;
-use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage, Transaction};
+use snarkvm_objects::Transaction;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
@@ -27,10 +27,10 @@ use snarkvm_utilities::{
 //  This is merely for local node / miner functionality.
 impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get all stored record commitments of the node
-    pub fn get_record_commitments(&self, limit: Option<usize>) -> Result<Vec<Vec<u8>>, StorageError> {
+    pub async fn get_record_commitments(&self, limit: Option<usize>) -> Result<Vec<Vec<u8>>, StorageError> {
         let mut record_commitments = vec![];
 
-        for commitment_key in self.storage.get_keys(COL_RECORDS)? {
+        for commitment_key in self.storage.get_keys(COL_RECORDS).await? {
             if let Some(limit) = limit {
                 if record_commitments.len() >= limit {
                     break;
@@ -44,8 +44,8 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Get a transaction bytes given the transaction id.
-    pub fn get_record<R: Record>(&self, record_commitment: &[u8]) -> Result<Option<R>, StorageError> {
-        match self.storage.get(COL_RECORDS, &record_commitment)? {
+    pub async fn get_record<R: Record>(&self, record_commitment: &[u8]) -> Result<Option<R>, StorageError> {
+        match self.storage.get(COL_RECORDS, &record_commitment).await? {
             Some(record_bytes) => {
                 let record: R = FromBytes::read(&record_bytes[..])?;
                 Ok(Some(record))
@@ -55,7 +55,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Get a transaction bytes given the transaction id.
-    pub fn store_record<R: Record>(&self, record: &R) -> Result<(), StorageError> {
+    pub async fn store_record<R: Record>(&self, record: &R) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 
         database_transaction.push(Op::Insert {
@@ -64,11 +64,11 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             value: to_bytes![record]?.to_vec(),
         });
 
-        self.storage.batch(database_transaction)
+        self.storage.batch(database_transaction).await
     }
 
     /// Get a transaction bytes given the transaction id.
-    pub fn store_records<R: Record>(&self, records: &[R]) -> Result<(), StorageError> {
+    pub async fn store_records<R: Record>(&self, records: &[R]) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 
         for record in records {
@@ -79,11 +79,11 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             });
         }
 
-        self.storage.batch(database_transaction)
+        self.storage.batch(database_transaction).await
     }
 
     /// Removes a record from storage.
-    pub fn delete_record<R: Record>(&self, record: R) -> Result<(), StorageError> {
+    pub async fn delete_record<R: Record>(&self, record: R) -> Result<(), StorageError> {
         let mut database_transaction = DatabaseTransaction::new();
 
         database_transaction.push(Op::Delete {
@@ -91,6 +91,6 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
             key: to_bytes![record.commitment()]?.to_vec(),
         });
 
-        self.storage.batch(database_transaction)
+        self.storage.batch(database_transaction).await
     }
 }

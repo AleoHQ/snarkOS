@@ -14,14 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_objects::Storage;
+use snarkos_storage::Storage;
 
 use crate::{stats, Direction, Message, NetworkError, Node, Payload, Peer};
 
 use super::network::PeerNetwork;
 
 impl Peer {
-    pub(super) async fn inner_dispatch_payload<S: Storage + Sync + Send + 'static>(
+    pub(super) async fn inner_dispatch_payload<S: Storage>(
         &mut self,
         node: &Node<S>,
         network: &mut PeerNetwork,
@@ -69,7 +69,7 @@ impl Peer {
         Ok(())
     }
 
-    pub(super) async fn dispatch_payload<S: Storage + Sync + Send + 'static>(
+    pub(super) async fn dispatch_payload<S: Storage>(
         &mut self,
         node: &Node<S>,
         network: &mut PeerNetwork,

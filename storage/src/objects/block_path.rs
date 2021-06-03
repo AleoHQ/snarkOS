@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Ledger;
+use crate::{Ledger, Storage, StorageError, COL_CHILD_HASHES};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{errors::StorageError, BlockError, BlockHeader, BlockHeaderHash, Storage, Transaction};
+use snarkvm_objects::{BlockError, BlockHeader, BlockHeaderHash, Transaction};
 
 const OLDEST_FORK_THRESHOLD: u32 = 1024;
 
@@ -39,18 +39,18 @@ pub struct SideChainPath {
     pub path: Vec<BlockHeaderHash>,
 }
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
+impl<T: Transaction + Send + 'static, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the block's path/origin.
-    pub fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
+    pub async fn get_block_path(&self, block_header: &BlockHeader) -> Result<BlockPath, StorageError> {
         let block_hash = block_header.get_hash();
 
         // The given block header already exists
-        if self.block_hash_exists(&block_hash) {
+        if self.block_hash_exists(&block_hash).await {
             return Ok(BlockPath::ExistingBlock);
         }
 
         // The given block header is valid on the canon chain
-        if self.get_latest_block()?.header.get_hash() == block_header.previous_block_hash {
+        if self.get_latest_block().await?.header.get_hash() == block_header.previous_block_hash {
             return Ok(BlockPath::CanonChain(self.get_current_block_height() + 1));
         }
 
@@ -60,12 +60,12 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         // Find the sidechain path (with a maximum size of OLDEST_FORK_THRESHOLD)
         for _ in 0..=OLDEST_FORK_THRESHOLD {
             // check if the part is part of the canon chain
-            match &self.get_block_number(&parent_hash) {
+            match &self.get_block_number(&parent_hash).await {
                 // This is a canon parent
                 Ok(block_num) => {
                     // Add the children from the latest block
 
-                    let longest_path = self.longest_child_path(block_hash)?;
+                    let longest_path = Self::longest_child_path(self.storage.clone(), block_hash).await?;
 
                     side_chain_path.extend(longest_path.1);
 
@@ -78,7 +78,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
                 // Add to the side_chain_path
                 Err(_) => {
                     side_chain_path.insert(0, parent_hash.clone());
-                    parent_hash = self.get_block_header(&parent_hash)?.previous_block_hash;
+                    parent_hash = self.get_block_header(&parent_hash).await?.previous_block_hash;
                 }
             }
         }
@@ -89,11 +89,15 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     }
 
     /// Returns the path length and the longest path of children from the given block header
-    pub fn longest_child_path(
-        &self,
+    #[async_recursion::async_recursion]
+    pub async fn longest_child_path(
+        storage: S,
         block_hash: BlockHeaderHash,
     ) -> Result<(usize, Vec<BlockHeaderHash>), StorageError> {
-        let children = self.get_child_block_hashes(&block_hash)?;
+        let children = match storage.get(COL_CHILD_HASHES, &block_hash.0).await? {
+            Some(encoded_child_block_hashes) => bincode::deserialize(&encoded_child_block_hashes[..])?,
+            None => vec![],
+        };
 
         let mut final_path = vec![block_hash];
 
@@ -102,7 +106,7 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
         } else {
             let mut paths = Vec::with_capacity(children.len());
             for child in children {
-                paths.push(self.longest_child_path(child)?);
+                paths.push(Self::longest_child_path(storage.clone(), child).await?);
             }
 
             match paths.iter().max_by_key(|x| x.0) {

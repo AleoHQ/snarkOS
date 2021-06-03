@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{master::SyncInbound, sync::master::SyncMaster, *};
-use snarkvm_objects::Storage;
+use snarkos_storage::Storage;
 
 use chrono::{DateTime, Utc};
 use once_cell::sync::OnceCell;
@@ -47,7 +47,7 @@ pub enum State {
 pub struct StateCode(AtomicU8);
 
 /// The internal state of a node.
-pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
+pub struct InnerNode<S: Storage> {
     /// The node's random numeric identifier.
     pub id: u64,
     /// The current state of the node.
@@ -76,9 +76,9 @@ pub struct InnerNode<S: Storage + core::marker::Sync + Send + 'static> {
 /// A core data structure for operating the networking stack of this node.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""))]
-pub struct Node<S: Storage + core::marker::Sync + Send + 'static>(Arc<InnerNode<S>>);
+pub struct Node<S: Storage>(Arc<InnerNode<S>>);
 
-impl<S: Storage + core::marker::Sync + Send + 'static> Deref for Node<S> {
+impl<S: Storage> Deref for Node<S> {
     type Target = Arc<InnerNode<S>>;
 
     fn deref(&self) -> &Self::Target {
@@ -86,7 +86,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Deref for Node<S> {
     }
 }
 
-impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
+impl<S: Storage> Node<S> {
     /// Returns the current state of the node.
     #[inline]
     pub fn state(&self) -> State {
@@ -107,7 +107,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
     }
 }
 
-impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
+impl<S: Storage> Node<S> {
     /// Creates a new instance of `Node`.
     pub async fn new(config: Config) -> Result<Self, NetworkError> {
         Ok(Self(Arc::new(InnerNode {

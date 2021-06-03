@@ -18,7 +18,7 @@ use crate::{errors::NetworkError, message::*, stats, Cache, Node, Receiver, Send
 
 use std::time::Duration;
 
-use snarkvm_objects::Storage;
+use snarkos_storage::Storage;
 use tokio::{
     net::TcpListener,
     sync::{mpsc::error::TrySendError, Mutex},
@@ -57,7 +57,7 @@ impl Inbound {
     }
 }
 
-impl<S: Storage + Send + Sync + 'static> Node<S> {
+impl<S: Storage> Node<S> {
     /// This method handles new inbound connection requests.
     pub async fn listen(&self) -> Result<(), NetworkError> {
         let listener = TcpListener::bind(&self.config.desired_address).await?;

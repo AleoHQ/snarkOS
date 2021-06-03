@@ -64,6 +64,19 @@ version = "1.2"
 version = "0.16.0"
 optional = true
 
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.tokio]
+version = "1"
+features = ["full"]
+
+[dependencies.async-recursion]
+version = "0.2"
+
+[dependencies.futures]
+version = "0.3"
+
 [dependencies.serde]
 version = "1.0"
 features = [ "derive" ]

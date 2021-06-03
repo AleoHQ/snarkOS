@@ -33,6 +33,9 @@ pub use insert_commit::*;
 pub mod ledger_scheme;
 pub use ledger_scheme::*;
 
+pub mod ledger_scheme_compat;
+pub use ledger_scheme_compat::*;
+
 pub mod memory_pool;
 pub use memory_pool::*;
 

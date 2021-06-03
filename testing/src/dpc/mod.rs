@@ -16,7 +16,6 @@
 
 use std::sync::Arc;
 
-use snarkos_consensus::MerkleTreeLedger;
 use snarkvm_algorithms::{MerkleParameters, CRH};
 use snarkvm_dpc::{
     base_dpc::{instantiated::*, parameters::PublicParameters},
@@ -24,18 +23,17 @@ use snarkvm_dpc::{
     AccountScheme,
     DPCScheme,
 };
-use snarkvm_objects::Storage;
 use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_utilities::bytes::FromBytes;
 
 use rand::Rng;
 
-pub fn setup_or_load_parameters<R: Rng, S: Storage>(
+pub fn setup_or_load_parameters<R: Rng>(
     verify_only: bool,
     rng: &mut R,
 ) -> (
     Arc<CommitmentMerkleParameters>,
-    <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+    <InstantiatedDPC as DPCScheme<CommitmentMerkleParameters>>::NetworkParameters,
 ) {
     // TODO (howardwu): Resolve this inconsistency on import structure with a new model once MerkleParameters are refactored.
     let crh_parameters =
@@ -44,14 +42,15 @@ pub fn setup_or_load_parameters<R: Rng, S: Storage>(
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_merkle_tree_parameters = Arc::new(From::from(merkle_tree_hash_parameters));
 
-    let parameters = match <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters::load(verify_only) {
-        Ok(parameters) => parameters,
-        Err(err) => {
-            println!("error - {}, re-running parameter Setup", err);
-            <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::setup(&ledger_merkle_tree_parameters, rng)
-                .expect("DPC setup failed")
-        }
-    };
+    let parameters =
+        match <InstantiatedDPC as DPCScheme<CommitmentMerkleParameters>>::NetworkParameters::load(verify_only) {
+            Ok(parameters) => parameters,
+            Err(err) => {
+                println!("error - {}, re-running parameter Setup", err);
+                <InstantiatedDPC as DPCScheme<CommitmentMerkleParameters>>::setup(&ledger_merkle_tree_parameters, rng)
+                    .expect("DPC setup failed")
+            }
+        };
 
     (ledger_merkle_tree_parameters, parameters)
 }
@@ -60,8 +59,8 @@ pub fn load_verifying_parameters() -> PublicParameters<Components> {
     PublicParameters::<Components>::load_vk_direct().unwrap()
 }
 
-pub fn generate_test_accounts<R: Rng, S: Storage>(
-    parameters: &<InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+pub fn generate_test_accounts<R: Rng>(
+    parameters: &<InstantiatedDPC as DPCScheme<CommitmentMerkleParameters>>::NetworkParameters,
     rng: &mut R,
 ) -> [Account<Components>; 3] {
     let signature_parameters = &parameters.system_parameters.account_signature;

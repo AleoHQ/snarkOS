@@ -18,45 +18,26 @@ use crate::*;
 use arc_swap::ArcSwap;
 use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
 use snarkvm_dpc::LedgerError;
-use snarkvm_objects::{Block, LedgerScheme, Storage, Transaction};
+use snarkvm_objects::{Block, Transaction};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     to_bytes,
 };
 
-use std::{fs, marker::PhantomData, path::Path, sync::Arc};
+use crate::Storage;
+use std::{marker::PhantomData, sync::Arc};
 
-impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for Ledger<T, P, S> {
-    type Block = Block<Self::Transaction>;
-    type Commitment = T::Commitment;
-    type MerkleParameters = P;
-    type MerklePath = MerklePath<Self::MerkleParameters>;
-    type MerkleTreeDigest = MerkleTreeDigest<Self::MerkleParameters>;
-    type SerialNumber = T::SerialNumber;
-    type Transaction = T;
-
+impl<T: Transaction + Send + 'static, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Instantiates a new ledger with a genesis block.
-    fn new(
-        path: Option<&Path>,
-        parameters: Arc<Self::MerkleParameters>,
-        genesis_block: Self::Block,
-    ) -> anyhow::Result<Self> {
-        let storage = if let Some(path) = path {
-            fs::create_dir_all(&path).map_err(|err| LedgerError::Message(err.to_string()))?;
-
-            S::open(Some(path), None)
-        } else {
-            S::open(None, None) // this must mean we're using an in-memory storage
-        }?;
-
-        if let Some(block_num) = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())? {
+    pub async fn new(storage: S, parameters: Arc<P>, genesis_block: Block<T>) -> anyhow::Result<Self> {
+        if let Some(block_num) = storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes()).await? {
             if bytes_to_u32(&block_num) != 0 {
                 return Err(LedgerError::ExistingDatabase.into());
             }
         }
 
         let leaves: &[[u8; 32]] = &[];
-        let empty_cm_merkle_tree = MerkleTree::<Self::MerkleParameters>::new(parameters.clone(), leaves)?;
+        let empty_cm_merkle_tree = MerkleTree::<P>::new(parameters.clone(), leaves)?;
 
         let ledger_storage = Self {
             current_block_height: Default::default(),
@@ -66,51 +47,56 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
             _transaction: PhantomData,
         };
 
-        ledger_storage.insert_and_commit(&genesis_block)?;
+        ledger_storage.insert_and_commit(&genesis_block).await?;
 
         Ok(ledger_storage)
     }
 
-    /// Returns the number of blocks including the genesis block
-    fn len(&self) -> usize {
-        self.get_current_block_height() as usize + 1
-    }
-
-    /// Return the parameters used to construct the ledger Merkle tree.
-    fn parameters(&self) -> &Arc<Self::MerkleParameters> {
-        &self.ledger_parameters
-    }
-
     /// Return a digest of the latest ledger Merkle tree.
-    fn digest(&self) -> Option<Self::MerkleTreeDigest> {
-        let digest: Self::MerkleTreeDigest = FromBytes::read(&self.current_digest().unwrap()[..]).unwrap();
+    pub async fn digest(&self) -> Option<MerkleTreeDigest<P>> {
+        let digest: MerkleTreeDigest<P> = FromBytes::read(&self.current_digest().await.unwrap()[..]).unwrap();
         Some(digest)
     }
 
     /// Check that st_{ts} is a valid digest for some (past) ledger state.
-    fn validate_digest(&self, digest: &Self::MerkleTreeDigest) -> bool {
-        self.storage.exists(COL_DIGEST, &to_bytes![digest].unwrap())
+    pub async fn validate_digest(&self, digest: &MerkleTreeDigest<P>) -> bool {
+        self.storage
+            .exists(COL_DIGEST, &to_bytes![digest].unwrap())
+            .await
+            .unwrap_or(false)
     }
 
     /// Returns true if the given commitment exists in the ledger.
-    fn contains_cm(&self, cm: &Self::Commitment) -> bool {
-        self.storage.exists(COL_COMMITMENT, &to_bytes![cm].unwrap())
+    pub async fn contains_cm(&self, cm: &T::Commitment) -> bool {
+        self.storage
+            .exists(COL_COMMITMENT, &to_bytes![cm].unwrap())
+            .await
+            .unwrap_or(false)
     }
 
     /// Returns true if the given serial number exists in the ledger.
-    fn contains_sn(&self, sn: &Self::SerialNumber) -> bool {
-        self.storage.exists(COL_SERIAL_NUMBER, &to_bytes![sn].unwrap())
+    pub async fn contains_sn(&self, sn: &T::SerialNumber) -> bool {
+        self.storage
+            .exists(COL_SERIAL_NUMBER, &to_bytes![sn].unwrap())
+            .await
+            .unwrap_or(false)
     }
 
     /// Returns true if the given memo exists in the ledger.
-    fn contains_memo(&self, memo: &<Self::Transaction as Transaction>::Memorandum) -> bool {
-        self.storage.exists(COL_MEMO, &to_bytes![memo].unwrap())
+    pub async fn contains_memo(&self, memo: &T::Memorandum) -> bool {
+        self.storage
+            .exists(COL_MEMO, &to_bytes![memo].unwrap())
+            .await
+            .unwrap_or(false)
     }
 
     /// Returns the Merkle path to the latest ledger digest
     /// for a given commitment, if it exists in the ledger.
-    fn prove_cm(&self, cm: &Self::Commitment) -> anyhow::Result<Self::MerklePath> {
-        let cm_index = self.get_cm_index(&to_bytes![cm]?)?.ok_or(LedgerError::InvalidCmIndex)?;
+    pub async fn prove_cm(&self, cm: &T::Commitment) -> anyhow::Result<MerklePath<P>> {
+        let cm_index = self
+            .get_cm_index(&to_bytes![cm]?)
+            .await?
+            .ok_or(LedgerError::InvalidCmIndex)?;
         let result = self.cm_merkle_tree.load().generate_proof(cm_index, cm)?;
 
         Ok(result)
@@ -118,11 +104,11 @@ impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> LedgerScheme for L
 
     /// Returns true if the given Merkle path is a valid witness for
     /// the given ledger digest and commitment.
-    fn verify_cm(
-        _parameters: &Arc<Self::MerkleParameters>,
-        digest: &Self::MerkleTreeDigest,
-        cm: &Self::Commitment,
-        witness: &Self::MerklePath,
+    pub fn verify_cm(
+        _parameters: &Arc<P>,
+        digest: &MerkleTreeDigest<P>,
+        cm: &T::Commitment,
+        witness: &MerklePath<P>,
     ) -> bool {
         witness.verify(&digest, cm).unwrap()
     }

@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm_objects::Storage;
+use std::{io::ErrorKind, time::Duration};
+
+use futures::{select, FutureExt};
+use snarkos_storage::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
 use super::PeerAction;
@@ -22,16 +25,26 @@ use crate::{stats, NetworkError, Node, Peer, PeerEvent, PeerEventData, PeerHandl
 
 use super::network::PeerNetwork;
 
+const CONNECTION_TIMEOUT_SECS: u64 = 3;
+
 impl Peer {
     async fn inner_connect(&mut self, our_version: Version) -> Result<PeerNetwork, NetworkError> {
         metrics::increment_gauge!(stats::CONNECTIONS_CONNECTING, 1.0);
         let _x = defer::defer(|| metrics::decrement_gauge!(stats::CONNECTIONS_CONNECTING, 1.0));
 
-        let stream = TcpStream::connect(self.address).await?;
-        self.inner_handshake_initiator(stream, our_version).await
+        let tcp_stream;
+        select! {
+            stream = TcpStream::connect(self.address).fuse() => {
+                tcp_stream = stream?;
+            },
+            _ = tokio::time::sleep(Duration::from_secs(CONNECTION_TIMEOUT_SECS)).fuse() => {
+                return Err(NetworkError::Io(std::io::Error::new(ErrorKind::TimedOut, "connection timed out")));
+            },
+        }
+        self.inner_handshake_initiator(tcp_stream, our_version).await
     }
 
-    pub fn connect<S: Storage + Send + Sync + 'static>(mut self, node: Node<S>, event_target: mpsc::Sender<PeerEvent>) {
+    pub fn connect<S: Storage>(mut self, node: Node<S>, event_target: mpsc::Sender<PeerEvent>) {
         let (sender, receiver) = mpsc::channel::<PeerAction>(64);
         tokio::spawn(async move {
             self.set_connecting();
@@ -61,8 +74,8 @@ impl Peer {
                         .await
                         .ok();
                     if let Err(e) = self.run(node, network, receiver).await {
+                        self.fail();
                         if !e.is_trivial() {
-                            self.fail();
                             error!(
                                 "unrecoverable failure communicating to outbound peer '{}': '{:?}'",
                                 self.address, e

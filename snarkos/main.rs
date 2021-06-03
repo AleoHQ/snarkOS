@@ -32,7 +32,7 @@ use snarkvm_dpc::{
     base_dpc::{instantiated::Components, parameters::PublicParameters, BaseDPCComponents},
     AccountAddress,
 };
-use snarkvm_objects::{Network, Storage};
+use snarkvm_objects::Network;
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{to_bytes, ToBytes};
 
@@ -172,16 +172,17 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // before any other object (miner, RPC) needs to use it.
     let mut node = Node::new(node_config).await?;
 
-    let is_storage_in_memory = LedgerStorage::IN_MEMORY;
+    // let is_storage_in_memory = LedgerStorage::IN_MEMORY;
 
-    let storage = if is_storage_in_memory {
-        Arc::new(MerkleTreeLedger::<LedgerStorage>::new_empty(
-            None::<std::path::PathBuf>,
-        )?)
-    } else {
-        info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
-        Arc::new(MerkleTreeLedger::<LedgerStorage>::open_at_path(path.clone())?)
-    };
+    // let storage = if is_storage_in_memory {
+    //     Arc::new(MerkleTreeLedger::<LedgerStorage>::new_empty(
+    //         None::<std::path::PathBuf>,
+    //     )?)
+    // } else {
+    info!("Loading storage at '{}'...", path.to_str().unwrap_or_default());
+    let storage = LedgerStorage::open(&path)?;
+    let storage = Arc::new(MerkleTreeLedger::<LedgerStorage>::load_ledger_state(storage).await?);
+    // };
     info!("Storage finished loading");
 
     // Enable the sync layer.
@@ -237,21 +238,13 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
 
     // Start RPC thread, if the RPC configuration is enabled.
     if config.rpc.json_rpc {
-        let secondary_storage = if is_storage_in_memory {
-            // In-memory storage doesn't require a secondary instance.
-            storage
-        } else {
-            // Open a secondary storage instance to prevent resource sharing and bottle-necking.
-            Arc::new(MerkleTreeLedger::open_secondary_at_path(path.clone())?)
-        };
-
         let rpc_address = format!("{}:{}", config.rpc.ip, config.rpc.port)
             .parse()
             .expect("Invalid RPC server address!");
 
         let rpc_handle = start_rpc_server(
             rpc_address,
-            secondary_storage,
+            storage,
             node.clone(),
             config.rpc.username,
             config.rpc.password,

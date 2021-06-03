@@ -15,19 +15,19 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{error::ConsensusError, Consensus};
+use snarkos_storage::Storage;
 use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
     base_dpc::{instantiated::*, record::DPCRecord},
     AccountAddress,
-    DPCScheme,
     Record,
 };
-use snarkvm_objects::{dpc::DPCTransactions, Block, BlockHeader, Storage, Transaction};
+use snarkvm_objects::{dpc::DPCTransactions, Block, BlockHeader, Transaction};
 use snarkvm_posw::{txids_to_roots, PoswMarlin};
 use snarkvm_utilities::{bytes::ToBytes, to_bytes};
 
 use chrono::Utc;
-use rand::{thread_rng, Rng};
+use rand::{prelude::StdRng, thread_rng, Rng, SeedableRng};
 use std::sync::Arc;
 
 /// Compiles transactions into blocks to be submitted to the network.
@@ -53,19 +53,20 @@ impl<S: Storage> Miner<S> {
     }
 
     /// Fetches new transactions from the memory pool.
-    pub fn fetch_memory_pool_transactions(&self) -> Result<DPCTransactions<Tx>, ConsensusError> {
+    pub async fn fetch_memory_pool_transactions(&self) -> Result<DPCTransactions<Tx>, ConsensusError> {
         let max_block_size = self.consensus.parameters.max_block_size;
 
         self.consensus
             .memory_pool
             .get_candidates(&self.consensus.ledger, max_block_size)
+            .await
     }
 
     /// Add a coinbase transaction to a list of candidate block transactions
-    pub fn add_coinbase_transaction<R: Rng>(
+    pub async fn add_coinbase_transaction<R: Rng + Send + 'static>(
         &self,
         transactions: &mut DPCTransactions<Tx>,
-        rng: &mut R,
+        rng: R,
     ) -> Result<Vec<DPCRecord<Components>>, ConsensusError> {
         let program_vk_hash = to_bytes![ProgramVerificationKeyCRH::hash(
             &self
@@ -93,15 +94,18 @@ impl<S: Storage> Miner<S> {
             }
         }
 
-        let (records, tx) = self.consensus.create_coinbase_transaction(
-            self.consensus.ledger.get_current_block_height() + 1,
-            transactions,
-            program_vk_hash,
-            new_birth_programs,
-            new_death_programs,
-            self.address.clone(),
-            rng,
-        )?;
+        let (records, tx) = self
+            .consensus
+            .create_coinbase_transaction(
+                self.consensus.ledger.get_current_block_height() + 1,
+                transactions,
+                program_vk_hash,
+                new_birth_programs,
+                new_death_programs,
+                self.address.clone(),
+                rng,
+            )
+            .await?;
 
         transactions.push(tx);
         Ok(records)
@@ -109,22 +113,23 @@ impl<S: Storage> Miner<S> {
 
     /// Acquires the storage lock and returns the previous block header and verified transactions.
     #[allow(clippy::type_complexity)]
-    pub fn establish_block(
+    pub async fn establish_block(
         &self,
         transactions: &DPCTransactions<Tx>,
     ) -> Result<(BlockHeader, DPCTransactions<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
-        let rng = &mut thread_rng();
         let mut transactions = transactions.clone();
-        let coinbase_records = self.add_coinbase_transaction(&mut transactions, rng)?;
+        let coinbase_records = self
+            .add_coinbase_transaction(&mut transactions, StdRng::from_rng(thread_rng()).unwrap())
+            .await?;
 
         // Verify transactions
-        assert!(InstantiatedDPC::verify_transactions(
-            &self.consensus.public_parameters,
-            &transactions.0,
-            &*self.consensus.ledger,
-        )?);
+        // assert!(InstantiatedDPC::verify_transactions(
+        //     &self.consensus.public_parameters,
+        //     &transactions.0,
+        //     &*self.consensus.ledger,
+        // )?);
 
-        let previous_block_header = self.consensus.ledger.get_latest_block()?.header;
+        let previous_block_header = self.consensus.ledger.get_latest_block().await?.header;
 
         Ok((previous_block_header, transactions, coinbase_records))
     }
@@ -164,11 +169,12 @@ impl<S: Storage> Miner<S> {
     /// Returns a mined block.
     /// Calls methods to fetch transactions, run proof of work, and add the block into the chain for storage.
     pub async fn mine_block(&self) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
-        let candidate_transactions = self.fetch_memory_pool_transactions()?;
+        let candidate_transactions = self.fetch_memory_pool_transactions().await?;
 
         debug!("The miner is creating a block");
 
-        let (previous_block_header, transactions, coinbase_records) = self.establish_block(&candidate_transactions)?;
+        let (previous_block_header, transactions, coinbase_records) =
+            self.establish_block(&candidate_transactions).await?;
 
         debug!("The miner generated a coinbase transaction");
 
@@ -192,7 +198,7 @@ impl<S: Storage> Miner<S> {
                 records_to_store.push(record.clone());
             }
         }
-        self.consensus.ledger.store_records(&records_to_store)?;
+        self.consensus.ledger.store_records(&records_to_store).await?;
 
         Ok((block, coinbase_records))
     }

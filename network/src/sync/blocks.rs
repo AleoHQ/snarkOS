@@ -16,16 +16,17 @@
 
 use crate::{master::SyncInbound, message::*, stats, NetworkError, Node};
 use snarkos_consensus::error::ConsensusError;
-use snarkvm_objects::{Block, BlockHeaderHash, Storage};
+use snarkos_storage::Storage;
+use snarkvm_objects::{Block, BlockHeaderHash};
 
 use std::net::SocketAddr;
 
-impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
+impl<S: Storage> Node<S> {
     ///
     /// Sends a `GetSync` request to the given sync node.
     ///
     pub async fn update_blocks(&self, sync_node: SocketAddr) {
-        let block_locator_hashes = match self.expect_sync().storage().get_block_locator_hashes() {
+        let block_locator_hashes = match self.expect_sync().storage().get_block_locator_hashes().await {
             Ok(block_locator_hashes) => block_locator_hashes,
             _ => {
                 error!("Unable to get block locator hashes from storage");
@@ -116,6 +117,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
         // Verify the block and insert it into the storage.
         let block_validity = self.expect_sync().consensus.receive_block(&block_struct).await;
 
+        info!("block received! {}", block_struct.header.time);
         if let Err(ConsensusError::PreExistingBlock) = block_validity {
             if is_block_new {
                 metrics::increment_counter!(stats::MISC_DUPLICATE_BLOCKS);
@@ -144,7 +146,7 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
         header_hashes: Vec<BlockHeaderHash>,
     ) -> Result<(), NetworkError> {
         for hash in header_hashes.into_iter().take(crate::MAX_BLOCK_SYNC_COUNT as usize) {
-            let block = self.expect_sync().storage().get_block(&hash)?;
+            let block = self.expect_sync().storage().get_block(&hash).await?;
 
             // Send a `SyncBlock` message to the connected peer.
             self.peer_book
@@ -164,10 +166,10 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
         let sync = {
             let storage = self.expect_sync().storage();
 
-            let latest_shared_hash = storage.get_latest_shared_hash(block_locator_hashes)?;
+            let latest_shared_hash = storage.get_latest_shared_hash(block_locator_hashes).await?;
             let current_height = storage.get_current_block_height();
 
-            if let Ok(height) = storage.get_block_number(&latest_shared_hash) {
+            if let Ok(height) = storage.get_block_number(&latest_shared_hash).await {
                 if height < current_height {
                     let mut max_height = current_height;
 
@@ -179,8 +181,8 @@ impl<S: Storage + Send + std::marker::Sync + 'static> Node<S> {
 
                     let mut block_hashes = Vec::with_capacity((max_height - height) as usize);
 
-                    for block_num in height + 1..=max_height {
-                        block_hashes.push(storage.get_block_hash(block_num)?);
+                    for block_num in height + 1u32..=max_height {
+                        block_hashes.push(storage.get_block_hash(block_num).await?);
                     }
 
                     // send block hashes to requester

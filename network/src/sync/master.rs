@@ -23,8 +23,9 @@ use std::{
 use crate::{NetworkError, Node, Payload, Peer};
 use futures::{pin_mut, select, FutureExt};
 use rand::prelude::SliceRandom;
+use snarkos_storage::Storage;
 use snarkvm_algorithms::crh::double_sha256;
-use snarkvm_objects::{BlockHeader, BlockHeaderHash, Storage};
+use snarkvm_objects::{BlockHeader, BlockHeaderHash};
 use tokio::{sync::mpsc, time::Instant};
 
 pub enum SyncInbound {
@@ -32,7 +33,7 @@ pub enum SyncInbound {
     Block(SocketAddr, Vec<u8>),
 }
 
-pub struct SyncMaster<S: Storage + Send + Sync + 'static> {
+pub struct SyncMaster<S: Storage> {
     node: Node<S>,
     incoming: mpsc::Receiver<SyncInbound>,
 }
@@ -42,7 +43,7 @@ struct SyncBlock {
     block: Vec<u8>,
 }
 
-impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
+impl<S: Storage> SyncMaster<S> {
     pub fn new(node: Node<S>) -> (Self, mpsc::Sender<SyncInbound>) {
         let (sender, receiver) = mpsc::channel(256);
         let new = Self {
@@ -78,7 +79,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
     }
 
     async fn block_locator_hashes(&mut self) -> Vec<BlockHeaderHash> {
-        match self.node.expect_sync().storage().get_block_locator_hashes() {
+        match self.node.expect_sync().storage().get_block_locator_hashes().await {
             Ok(block_locator_hashes) => block_locator_hashes,
             _ => {
                 error!("Unable to get block locator hashes from storage");
@@ -92,7 +93,6 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
 
         info!("requested block information from {} peers", sync_nodes.len());
         let block_locator_hashes = self.block_locator_hashes().await;
-
         let mut sent = 0usize;
         let mut future_set = vec![];
         for peer in sync_nodes.iter() {
@@ -298,9 +298,14 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         let early_blocks_count = early_blocks.len();
 
         let ledger = &self.node.expect_sync().consensus.ledger;
+        let block_order: Vec<_> = early_blocks.iter().map(|x| ledger.block_hash_exists(x)).collect();
+        let block_order = futures::future::join_all(block_order).await;
+
         let block_order: Vec<BlockHeaderHash> = early_blocks
             .into_iter()
-            .filter(|x| !ledger.block_hash_exists(x))
+            .zip(block_order)
+            .filter(|(_, present)| !*present)
+            .map(|x| x.0)
             .collect();
 
         info!(

@@ -91,8 +91,20 @@ async fn block_initiator_side() {
     peer.write_message(&block_2).await;
 
     // check the blocks have been added to the node's chain
-    wait_until!(1, node.expect_sync().storage().block_hash_exists(&block_1_header_hash));
-    wait_until!(1, node.expect_sync().storage().block_hash_exists(&block_2_header_hash));
+    wait_until!(
+        1,
+        node.expect_sync()
+            .storage()
+            .block_hash_exists(&block_1_header_hash)
+            .await
+    );
+    wait_until!(
+        1,
+        node.expect_sync()
+            .storage()
+            .block_hash_exists(&block_2_header_hash)
+            .await
+    );
 }
 
 #[tokio::test]

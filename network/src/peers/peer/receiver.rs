@@ -16,7 +16,7 @@
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use snarkvm_objects::Storage;
+use snarkos_storage::Storage;
 use tokio::{net::TcpStream, sync::mpsc};
 
 use super::PeerAction;
@@ -36,7 +36,7 @@ impl Peer {
         Peer::inner_handshake_responder(remote_address, stream, our_version).await
     }
 
-    pub fn receive<S: Storage + Send + Sync + 'static>(
+    pub fn receive<S: Storage>(
         remote_address: SocketAddr,
         node: Node<S>,
         stream: TcpStream,
@@ -72,8 +72,8 @@ impl Peer {
                 .await
                 .ok();
             if let Err(e) = peer.run(node, network, receiver).await {
+                peer.fail();
                 if !e.is_trivial() {
-                    peer.fail();
                     error!(
                         "unrecoverable failure communicating to inbound peer '{}': '{:?}'",
                         peer.address, e

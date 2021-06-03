@@ -16,12 +16,11 @@
 
 use crate::{Node, State};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
-use snarkos_storage::BlockHeight;
+use snarkos_storage::{BlockHeight, Storage};
 use snarkvm_dpc::base_dpc::{
     instantiated::{Components, Tx},
     parameters::PublicParameters,
 };
-use snarkvm_objects::Storage;
 
 use atomic_instant::AtomicInstant;
 use std::{sync::Arc, time::Duration};
@@ -40,7 +39,7 @@ pub struct Sync<S: Storage> {
     last_block_sync: AtomicInstant,
 }
 
-impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
+impl<S: Storage> Sync<S> {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         consensus: Arc<snarkos_consensus::Consensus<S>>,

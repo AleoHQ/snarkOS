@@ -14,23 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Ledger, COL_META, KEY_MEMORY_POOL};
+use crate::{DatabaseTransaction, Ledger, Op, Storage, StorageError, COL_META, KEY_MEMORY_POOL};
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
-use snarkvm_objects::{errors::StorageError, DatabaseTransaction, Op, Storage, Transaction};
+use snarkvm_objects::Transaction;
 
 impl<T: Transaction, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the stored memory pool transactions.
-    pub fn get_memory_pool(&self) -> Result<Option<Vec<u8>>, StorageError> {
-        self.storage.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec())
+    pub async fn get_memory_pool(&self) -> Result<Option<Vec<u8>>, StorageError> {
+        self.storage.get(COL_META, &KEY_MEMORY_POOL.as_bytes().to_vec()).await
     }
 
     /// Store the memory pool transactions.
-    pub fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
+    pub async fn store_to_memory_pool(&self, transactions_serialized: Vec<u8>) -> Result<(), StorageError> {
         let op = Op::Insert {
             col: COL_META,
             key: KEY_MEMORY_POOL.as_bytes().to_vec(),
             value: transactions_serialized,
         };
-        self.storage.batch(DatabaseTransaction(vec![op]))
+        self.storage.batch(DatabaseTransaction(vec![op])).await
     }
 }

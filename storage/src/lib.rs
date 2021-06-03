@@ -17,6 +17,9 @@
 pub mod ledger;
 pub use ledger::*;
 
+pub mod storage;
+pub use storage::*;
+
 pub mod key_value;
 pub use key_value::*;
 

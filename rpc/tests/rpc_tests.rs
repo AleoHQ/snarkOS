@@ -120,7 +120,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_block() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let response = rpc.request("getblock", &[hex::encode(GENESIS_BLOCK_HEADER_HASH.to_vec())]);
@@ -153,7 +153,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_block_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let method = "getblockcount".to_string();
@@ -165,7 +165,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_best_block_hash() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let method = "getbestblockhash".to_string();
@@ -180,7 +180,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_block_hash() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         assert_eq!(rpc.request("getblockhash", &[0u32]), format![
@@ -191,7 +191,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let genesis_block = genesis();
@@ -207,7 +207,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_transaction_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let genesis_block = genesis();
@@ -224,7 +224,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_decode_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let response = rpc.request("decoderawtransaction", &[hex::encode(TRANSACTION_1.to_vec())]);
@@ -237,7 +237,7 @@ mod rpc_tests {
     // multithreaded necessary due to use of non-async jsonrpc & internal use of async
     #[tokio::test(flavor = "multi_thread")]
     async fn test_rpc_send_raw_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
@@ -250,7 +250,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_validate_transaction() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         assert_eq!(
@@ -261,7 +261,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_connection_count() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let method = "getconnectioncount".to_string();
@@ -273,7 +273,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_peer_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let method = "getpeerinfo".to_string();
@@ -289,7 +289,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_node_info() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let rpc = initialize_test_rpc(storage).await;
 
         let method = "getnodeinfo".to_string();
@@ -304,7 +304,7 @@ mod rpc_tests {
 
     #[tokio::test]
     async fn test_rpc_get_block_template() {
-        let storage = Arc::new(FIXTURE_VK.ledger());
+        let storage = Arc::new(FIXTURE_VK.ledger().await);
         let curr_height = storage.get_current_block_height();
         let latest_block_hash = hex::encode(storage.get_latest_block().unwrap().header.get_hash().0);
 

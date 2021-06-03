@@ -23,7 +23,7 @@ use crate::{
 };
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_network::Node;
-use snarkvm_objects::Storage;
+use snarkos_storage::Storage;
 
 use hyper::{
     body::HttpBody,
@@ -58,7 +58,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 14] = [
 ];
 
 #[allow(clippy::too_many_arguments)]
-pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
+pub fn start_rpc_server<S: Storage>(
     rpc_addr: SocketAddr,
     secondary_storage: Arc<MerkleTreeLedger<S>>,
     node_server: Node<S>,
@@ -84,7 +84,7 @@ pub fn start_rpc_server<S: Storage + Send + Sync + 'static>(
     })
 }
 
-async fn handle_rpc<S: Storage + Send + Sync + 'static>(
+async fn handle_rpc<S: Storage>(
     rpc: RpcImpl<S>,
     req: hyper::Request<Body>,
 ) -> Result<hyper::Response<Body>, Infallible> {
