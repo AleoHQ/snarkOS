@@ -262,6 +262,15 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         Ok(Value::Null)
     }
 
+    /// Gracefully shuts the node down
+    pub async fn shutdown_protected(self, _params: Params, meta: Meta) -> Result<Value, JsonRPCError> {
+        self.validate_auth(meta)?;
+
+        self.node.shut_down();
+
+        Ok(Value::Null)
+    }
+
     /// Expose the protected functions as RPC enpoints
     pub fn add_protected(&self, io: &mut MetaIoHandler<Meta>) {
         let mut d = IoDelegate::<Self, Meta>::new(Arc::new(self.clone()));
@@ -305,6 +314,10 @@ impl<S: Storage + Send + Sync + 'static> RpcImpl<S> {
         d.add_method_with_meta("disconnect", |rpc, params, meta| {
             let rpc = rpc.clone();
             rpc.disconnect_protected(params, meta)
+        });
+        d.add_method_with_meta("shutdown", |rpc, params, meta| {
+            let rpc = rpc.clone();
+            rpc.shutdown_protected(params, meta)
         });
 
         io.extend_with(d)

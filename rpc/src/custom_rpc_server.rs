@@ -281,6 +281,13 @@ async fn handle_rpc<S: Storage + Send + Sync + 'static>(
                 .map_err(convert_core_err);
             result_to_response(&req, result)
         }
+        "shutdown" => {
+            let result = rpc
+                .shutdown_protected(Params::Array(params), meta)
+                .await
+                .map_err(convert_core_err);
+            result_to_response(&req, result)
+        }
         _ => {
             let err = jrt::Error::from_code(jrt::ErrorCode::MethodNotFound);
             jrt::Response::error(jrt::Version::V2, err, req.id.clone())
