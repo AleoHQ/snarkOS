@@ -2124,9 +2124,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ef9e7e66b4468674bfcb0c81af8b7fa0bb154fa9f28eb840da5c447baeb8d7e"
+checksum = "2e7573632e6454cf6b99d7aac4ccca54be06da05aca2ef7423d22d27d4d4bcd8"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -2628,7 +2628,7 @@ dependencies = [
  "dirs",
  "hex",
  "parking_lot",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rusty-hook",
  "self_update",
  "serde",
@@ -2656,7 +2656,7 @@ dependencies = [
  "csv",
  "derivative",
  "digest 0.7.6",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_xorshift",
  "rayon",
  "smallvec",
@@ -2681,7 +2681,7 @@ dependencies = [
  "criterion",
  "hex",
  "mpmc-map",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_xorshift",
  "snarkos-profiler",
  "snarkos-storage",
@@ -2732,7 +2732,7 @@ dependencies = [
  "nalgebra",
  "once_cell",
  "peak_alloc",
- "rand 0.8.3",
+ "rand 0.8.4",
  "serde",
  "snarkos-consensus",
  "snarkos-metrics",
@@ -2757,7 +2757,7 @@ dependencies = [
  "chrono",
  "curl",
  "hex",
- "rand 0.8.3",
+ "rand 0.8.4",
  "snarkos-consensus",
  "snarkos-storage",
  "snarkvm-algorithms",
@@ -2794,7 +2794,7 @@ dependencies = [
  "jsonrpc-derive",
  "jsonrpc-test",
  "parking_lot",
- "rand 0.8.3",
+ "rand 0.8.4",
  "serde",
  "serde_json",
  "snarkos-consensus",
@@ -2820,7 +2820,7 @@ dependencies = [
  "bincode",
  "hex",
  "parking_lot",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rocksdb",
  "serde",
  "snarkos-consensus",
@@ -2845,7 +2845,7 @@ dependencies = [
  "bincode",
  "futures 0.3.15",
  "once_cell",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_xorshift",
  "snarkos-consensus",
  "snarkos-network",
@@ -2872,7 +2872,7 @@ dependencies = [
  "criterion",
  "getrandom 0.2.3",
  "hex",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_chacha 0.3.1",
  "snarkvm-algorithms",
  "snarkvm-dpc",
@@ -2893,7 +2893,7 @@ dependencies = [
  "derivative",
  "digest 0.9.0",
  "itertools 0.10.1",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_chacha 0.3.1",
  "rayon",
  "sha2",
@@ -2913,7 +2913,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b1a4b3cb0a68de48d3263a25fa63a3ae14df1f5042fdf536a207b616f1e4217"
 dependencies = [
  "derivative",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_xorshift",
  "rustc_version 0.3.3",
  "serde",
@@ -2951,7 +2951,7 @@ dependencies = [
  "hex",
  "itertools 0.10.1",
  "once_cell",
- "rand 0.8.3",
+ "rand 0.8.4",
  "serde",
  "sha2",
  "snarkvm-algorithms",
@@ -2973,7 +2973,7 @@ checksum = "818e32f60d87abbe22e04d44ec358849e78393ae7e0a315334e3402dea909198"
 dependencies = [
  "bincode",
  "derivative",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_xorshift",
  "serde",
  "snarkvm-utilities",
@@ -3010,7 +3010,7 @@ dependencies = [
  "derivative",
  "digest 0.9.0",
  "hashbrown 0.11.2",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_chacha 0.3.1",
  "rand_core 0.6.2",
  "rayon",
@@ -3063,7 +3063,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1af4fd2212a3fc46589fc5956c3df9e9d70c2ce22170dfa26a47b035be955d3"
 dependencies = [
  "blake2",
- "rand 0.8.3",
+ "rand 0.8.4",
  "snarkvm-algorithms",
  "snarkvm-curves",
  "snarkvm-dpc",
@@ -3106,7 +3106,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2c3439bd12599fcaca1d885eb9051c885f2276be2dd0e2692e5f90cc03466f1"
 dependencies = [
  "bincode",
- "rand 0.8.3",
+ "rand 0.8.4",
  "snarkvm-derives",
  "thiserror",
 ]
@@ -3120,7 +3120,7 @@ dependencies = [
  "blake2",
  "byteorder",
  "chacha20poly1305",
- "rand 0.8.3",
+ "rand 0.8.4",
  "rand_core 0.6.2",
  "rustc_version 0.3.3",
  "sha2",
@@ -3220,7 +3220,7 @@ checksum = "dac1c663cfc93810f88aed9b8941d48cabf856a1b111c29a40439018d870eb22"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
- "rand 0.8.3",
+ "rand 0.8.4",
  "redox_syscall",
  "remove_dir_all",
  "winapi",
