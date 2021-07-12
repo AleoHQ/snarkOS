@@ -145,7 +145,7 @@ version = "0.1"
 path = "../testing"
 
 [dev-dependencies.nalgebra]
-version = "0.27"
+version = "0.28"
 
 [dev-dependencies.peak_alloc]
 version = "0.1.0"
