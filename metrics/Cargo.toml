@@ -22,7 +22,7 @@ std = [ ]
 prometheus = [ "metrics-exporter-prometheus" ]
 
 [dependencies.metrics]
-version = "0.16"
+version = "0.17"
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.5"
