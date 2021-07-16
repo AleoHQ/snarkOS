@@ -52,7 +52,7 @@ pub fn render_welcome(config: &Config) -> String {
             }
             Err(_) => {
                 output +=
-                    &"Miner not started. Please specify a valid miner address in your ~/.snarkOS/snarkOS.toml file or by using the --miner-address option in the CLI.\n\n"
+                    &"Miner not started. Please specify a valid miner address in your ~/.snarkOS/config.toml file or by using the --miner-address option in the CLI.\n\n"
                 .red().bold();
 
                 is_miner = false;
