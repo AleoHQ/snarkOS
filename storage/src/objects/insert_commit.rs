@@ -132,18 +132,6 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             return Err(StorageError::DuplicateMemo);
         }
 
-        for (index, transaction) in block.transactions.0.iter().enumerate() {
-            let transaction_location = TransactionLocation {
-                index: index as u32,
-                block_hash: block_hash.0,
-            };
-            database_transaction.push(Op::Insert {
-                col: COL_TRANSACTION_LOCATION,
-                key: transaction.transaction_id()?.to_vec(),
-                value: to_bytes![transaction_location]?,
-            });
-        }
-
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_HEADER,
             key: block_hash.0.to_vec(),
