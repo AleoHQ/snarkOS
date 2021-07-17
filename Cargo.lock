@@ -1646,9 +1646,9 @@ dependencies = [
 
 [[package]]
 name = "mpmc-map"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e950c4440703d9c82bed62ef3ff90100230150b3ae26584b1031eca39c89464"
+checksum = "f25ba43df177286c05021106ac009fc059226acafc06afdd8f8cf16d6ecd54e2"
 dependencies = [
  "arc-swap",
  "im",

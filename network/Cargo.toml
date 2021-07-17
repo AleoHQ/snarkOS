@@ -151,7 +151,7 @@ version = "1.2"
 version = "0.1"
 
 [dependencies.mpmc-map]
-version = "0.1"
+version = "0.2"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"
