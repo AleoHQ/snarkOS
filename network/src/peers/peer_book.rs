@@ -149,7 +149,7 @@ impl PeerBook {
         self.pending_connections.load(Ordering::SeqCst)
     }
 
-    pub async fn receive_connection<S: Storage + Send + Sync + 'static>(
+    pub fn receive_connection<S: Storage + Send + Sync + 'static>(
         &self,
         node: Node<S>,
         address: SocketAddr,

@@ -104,7 +104,7 @@ async fn start_server(config: Config) -> anyhow::Result<()> {
     // Construct the node instance. Note this does not start the network services.
     // This is done early on, so that the local address can be discovered
     // before any other object (miner, RPC) needs to use it.
-    let mut node = Node::new(node_config).await?;
+    let mut node = Node::new(node_config)?;
 
     let is_storage_in_memory = LedgerStorage::IN_MEMORY;
 

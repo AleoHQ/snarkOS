@@ -79,7 +79,7 @@ mod protected_rpc_tests {
         };
 
         let environment = test_config(TestSetup::default());
-        let mut node = Node::new(environment).await.unwrap();
+        let mut node = Node::new(environment).unwrap();
         let consensus_setup = ConsensusSetup::default();
         let consensus = Arc::new(snarkos_testing::sync::create_test_consensus_from_ledger(ledger.clone()));
 

@@ -36,21 +36,21 @@ pub enum Topology {
 /// started yet, as it uses the bootnodes to establish the connections between nodes.
 ///
 /// When connecting in a `Star`, the first node in the `nodes` will be used as the hub.
-pub async fn connect_nodes(nodes: &mut Vec<Node<LedgerStorage>>, topology: Topology) {
+pub fn connect_nodes(nodes: &mut Vec<Node<LedgerStorage>>, topology: Topology) {
     if nodes.len() < 2 {
         panic!("Can't connect less than two nodes");
     }
 
     match topology {
-        Topology::Line => line(nodes).await,
-        Topology::Ring => ring(nodes).await,
-        Topology::Mesh => mesh(nodes).await,
-        Topology::Star => star(nodes).await,
+        Topology::Line => line(nodes),
+        Topology::Ring => ring(nodes),
+        Topology::Mesh => mesh(nodes),
+        Topology::Star => star(nodes),
     }
 }
 
 /// Connects the network nodes in a line topology.
-async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
+fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
     let mut prev_node: Option<SocketAddr> = None;
 
     // Start each node with the previous as a bootnode.
@@ -67,9 +67,9 @@ async fn line(nodes: &mut Vec<Node<LedgerStorage>>) {
 }
 
 /// Connects the network nodes in a ring topology.
-async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
+fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Set the nodes up in a line.
-    line(nodes).await;
+    line(nodes);
 
     // Connect the first to the last.
     let first_addr = nodes.first().unwrap().local_address().unwrap();
@@ -81,7 +81,7 @@ async fn ring(nodes: &mut Vec<Node<LedgerStorage>>) {
 
 /// Connects the network nodes in a mesh topology. The inital peers are selected at random based on the
 /// minimum number of connected peers value.
-async fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
+fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
     let local_addresses: Vec<SocketAddr> = nodes.iter().map(|node| node.local_address().unwrap()).collect();
 
     for node in nodes {
@@ -98,7 +98,7 @@ async fn mesh(nodes: &mut Vec<Node<LedgerStorage>>) {
 }
 
 /// Connects the network nodes in a star topology.
-async fn star(nodes: &mut Vec<Node<LedgerStorage>>) {
+fn star(nodes: &mut Vec<Node<LedgerStorage>>) {
     // Setup the hub.
     let hub_address = nodes.first().unwrap().local_address().unwrap();
 

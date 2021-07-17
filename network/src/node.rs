@@ -112,7 +112,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Node<S> {
 
 impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
     /// Creates a new instance of `Node`.
-    pub async fn new(config: Config) -> Result<Self, NetworkError> {
+    pub fn new(config: Config) -> Result<Self, NetworkError> {
         let node = Self(Arc::new(InnerNode {
             id: thread_rng().gen(),
             state: Default::default(),

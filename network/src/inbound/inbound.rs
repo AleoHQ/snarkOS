@@ -83,7 +83,6 @@ impl<S: Storage + Send + Sync + 'static> Node<S> {
                             match node_clone
                                 .peer_book
                                 .receive_connection(node_clone.clone(), remote_address, stream)
-                                .await
                             {
                                 Ok(_) => (),
                                 Err(e) => {

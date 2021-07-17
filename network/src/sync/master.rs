@@ -77,7 +77,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         interesting_peers
     }
 
-    async fn block_locator_hashes(&mut self) -> Vec<BlockHeaderHash> {
+    fn block_locator_hashes(&mut self) -> Vec<BlockHeaderHash> {
         match self.node.expect_sync().storage().get_block_locator_hashes() {
             Ok(block_locator_hashes) => block_locator_hashes,
             _ => {
@@ -91,7 +91,7 @@ impl<S: Storage + Send + Sync + 'static> SyncMaster<S> {
         let sync_nodes = self.find_sync_nodes().await;
 
         info!("requested block information from {} peers", sync_nodes.len());
-        let block_locator_hashes = self.block_locator_hashes().await;
+        let block_locator_hashes = self.block_locator_hashes();
         let mut future_set = vec![];
         for peer in sync_nodes.iter() {
             if let Some(handle) = self.node.peer_book.get_peer_handle(peer.address) {
