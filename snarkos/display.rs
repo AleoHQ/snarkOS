@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::config::Config;
-use snarkvm_dpc::{testnet1::instantiated::Components, AccountAddress};
+use snarkvm_dpc::{testnet1::instantiated::Components, Address};
 
 use colored::*;
 use std::str::FromStr;
@@ -44,7 +44,7 @@ pub fn render_welcome(config: &Config) -> String {
 
     let mut is_miner = config.miner.is_miner;
     if is_miner {
-        match AccountAddress::<Components>::from_str(&config.miner.miner_address) {
+        match Address::<Components>::from_str(&config.miner.miner_address) {
             Ok(miner_address) => {
                 output += &format!("Your Aleo address is {}.\n\n", miner_address)
                     .bold()

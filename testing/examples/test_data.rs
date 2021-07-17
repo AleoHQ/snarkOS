@@ -17,21 +17,22 @@
 use snarkos_consensus::{error::ConsensusError, Consensus, Miner};
 use snarkos_testing::sync::*;
 use snarkvm_dpc::{
-    block::Transactions as DPCTransactions,
+    block::Transactions,
     testnet1::{
         instantiated::*,
-        record::{payload::Payload as RecordPayload, Record as DPCRecord},
+        record::{payload::Payload as RecordPayload, Record},
     },
     Account,
-    AccountAddress,
+    Address,
     Block,
+    DPCComponents,
     ProgramScheme,
     RecordScheme,
     Storage,
 };
 use snarkvm_utilities::bytes::ToBytes;
 
-use rand::Rng;
+use rand::{CryptoRng, Rng};
 use std::{fs::File, path::PathBuf, sync::Arc};
 
 fn setup_test_data() -> Result<TestData, ConsensusError> {
@@ -45,7 +46,7 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
     // mine an empty block
     let (block_1, coinbase_records) = mine_block(&miner, vec![])?;
 
-    // make a tx which spends 10 to the BaseDPCComponents receiver
+    // make a tx which spends 10 to the Testnet1Components receiver
     let (_records_1, tx_1) = send(
         &consensus,
         &miner_acc,
@@ -80,9 +81,9 @@ fn setup_test_data() -> Result<TestData, ConsensusError> {
 
 fn mine_block<S: Storage>(
     miner: &Miner<S>,
-    txs: Vec<Tx>,
-) -> Result<(Block<Tx>, Vec<DPCRecord<Components>>), ConsensusError> {
-    let transactions = DPCTransactions(txs);
+    txs: Vec<Testnet1Transaction>,
+) -> Result<(Block<Testnet1Transaction>, Vec<Record<Components>>), ConsensusError> {
+    let transactions = Transactions(txs);
 
     let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions)?;
 
@@ -98,26 +99,20 @@ fn mine_block<S: Storage>(
     let new_block_height = miner.consensus.ledger.get_current_block_height();
     assert_eq!(old_block_height + 1, new_block_height);
 
-    // Duplicate blocks dont do anything
-    futures::executor::block_on(miner.consensus.receive_block(&block, false))?;
-
-    let new_block_height = miner.consensus.ledger.get_current_block_height();
-    assert_eq!(old_block_height + 1, new_block_height);
-
     Ok((block, coinbase_records))
 }
 
 /// Spends some value from inputs owned by the sender, to the receiver,
 /// and pays back whatever we are left with.
 #[allow(clippy::too_many_arguments)]
-fn send<R: Rng, S: Storage>(
+fn send<R: Rng + CryptoRng, S: Storage>(
     consensus: &Consensus<S>,
     from: &Account<Components>,
-    inputs: Vec<DPCRecord<Components>>,
-    receiver: &AccountAddress<Components>,
+    inputs: Vec<Record<Components>>,
+    receiver: &Address<Components>,
     amount: u64,
     rng: &mut R,
-) -> Result<(Vec<DPCRecord<Components>>, Tx), ConsensusError> {
+) -> Result<(Vec<Record<Components>>, Testnet1Transaction), ConsensusError> {
     let mut sum = 0;
     for inp in &inputs {
         sum += inp.value();
@@ -125,15 +120,15 @@ fn send<R: Rng, S: Storage>(
     assert!(sum >= amount, "not enough balance in inputs");
     let change = sum - amount;
 
-    let input_programs = vec![FIXTURE.program.into_compact_repr(); NUM_INPUT_RECORDS];
-    let output_programs = vec![FIXTURE.program.into_compact_repr(); NUM_OUTPUT_RECORDS];
+    let input_programs = vec![FIXTURE.program.id(); Components::NUM_INPUT_RECORDS];
+    let output_programs = vec![FIXTURE.program.id(); Components::NUM_OUTPUT_RECORDS];
 
     let to = vec![receiver.clone(), from.address.clone()];
     let values = vec![amount, change];
-    let output = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
-    let dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
+    let output = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
+    let dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
 
-    let from = vec![from.private_key.clone(); NUM_INPUT_RECORDS];
+    let from = vec![from.private_key.clone(); Components::NUM_INPUT_RECORDS];
     consensus.create_transaction(
         inputs,
         from,
@@ -148,11 +143,12 @@ fn send<R: Rng, S: Storage>(
     )
 }
 
-pub fn main() {
+#[tokio::main]
+pub async fn main() {
     let test_data = setup_test_data().unwrap();
 
     const TEST_DATA_FILE: &str = "test_data";
 
     let file = std::io::BufWriter::new(File::create(PathBuf::from(TEST_DATA_FILE)).expect("could not open file"));
-    test_data.write(file).expect("could not write to file");
+    test_data.write_le(file).expect("could not write to file");
 }

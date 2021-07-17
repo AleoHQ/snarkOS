@@ -24,19 +24,19 @@ mem_storage = [ ]
 test = [ ]
 
 [dependencies.snarkvm-algorithms]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkvm-dpc]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.parking_lot]
 version = "0.11"
 
 [dependencies.snarkvm-parameters]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkvm-utilities]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkos-parameters]
 path = "../parameters"
@@ -80,7 +80,7 @@ version = "0.1"
 path = "../consensus"
 
 [dev-dependencies.snarkvm-curves]
-version = "0.5.4"
+version = "0.7.3"
 
 [dev-dependencies.snarkos-testing]
 path = "../testing"

@@ -23,7 +23,7 @@ pub mod trim;
 #[cfg(test)]
 pub mod validator;
 
-use crate::sync::TestTx;
+use crate::sync::TestTestnet1Transaction;
 pub use snarkos_storage::{Ledger, LedgerStorage};
 use snarkvm_algorithms::traits::merkle_tree::LoadableMerkleParameters;
 use snarkvm_dpc::{
@@ -37,7 +37,7 @@ use snarkvm_dpc::{
 use rand::{thread_rng, Rng};
 use std::sync::Arc;
 
-pub type Store = Ledger<TestTx, CommitmentMerkleParameters, LedgerStorage>;
+pub type Store = Ledger<TestTestnet1Transaction, CommitmentMerkleParameters, LedgerStorage>;
 
 pub fn random_storage_path() -> String {
     let random_path: usize = thread_rng().gen();

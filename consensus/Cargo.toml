@@ -18,19 +18,19 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.snarkvm-algorithms]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkvm-curves]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkvm-dpc]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkvm-posw]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkvm-utilities]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.metrics]
 version = "0.16"
@@ -68,7 +68,7 @@ version = "0.8"
 version = "1.0"
 
 [dependencies.mpmc-map]
-version = "0.1"
+version = "0.2"
 
 [dependencies.tracing]
 default-features = false
@@ -79,6 +79,9 @@ version = "0.1"
 path = "../testing"
 
 [dev-dependencies.criterion]
+version = "0.3"
+
+[dev-dependencies.rand_chacha]
 version = "0.3"
 
 [dev-dependencies.rand_xorshift]

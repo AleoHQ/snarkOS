@@ -17,7 +17,7 @@
 mod consensus_sidechain {
     use snarkos_storage::validator::FixMode;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{testnet1::instantiated::Tx, Block};
+    use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Block};
     use snarkvm_utilities::bytes::FromBytes;
 
     use rand::{seq::IteratorRandom, thread_rng, Rng};
@@ -34,12 +34,12 @@ mod consensus_sidechain {
 
         // Find second block
 
-        let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
+        let block_2 = Block::<Testnet1Transaction>::read_le(&BLOCK_2[..]).unwrap();
         consensus.receive_block(&block_2, false).await.unwrap();
 
         // Find first block
 
-        let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
+        let block_1 = Block::<Testnet1Transaction>::read_le(&BLOCK_1[..]).unwrap();
         consensus.receive_block(&block_1, false).await.unwrap();
 
         // Check balances after both blocks
@@ -54,8 +54,8 @@ mod consensus_sidechain {
     async fn reject() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
-        let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        let block_1_side = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
+        let block_1_canon = Block::<Testnet1Transaction>::read_le(&BLOCK_1[..]).unwrap();
+        let block_1_side = Block::<Testnet1Transaction>::read_le(&ALTERNATIVE_BLOCK_1[..]).unwrap();
 
         let old_block_height = consensus.ledger.get_current_block_height();
 
@@ -83,9 +83,9 @@ mod consensus_sidechain {
     async fn accept() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
-        let block_1_canon = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
-        let block_1_side = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        let block_2_side = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
+        let block_1_canon = Block::<Testnet1Transaction>::read_le(&ALTERNATIVE_BLOCK_1[..]).unwrap();
+        let block_1_side = Block::<Testnet1Transaction>::read_le(&BLOCK_1[..]).unwrap();
+        let block_2_side = Block::<Testnet1Transaction>::read_le(&BLOCK_2[..]).unwrap();
 
         // 1. Receive shorter chain of block_1_canon.
 
@@ -114,10 +114,10 @@ mod consensus_sidechain {
     async fn fork_out_of_order() {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
-        let block_1_canon = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
-        let block_2_canon = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
-        let block_1_side = Block::<Tx>::read(&ALTERNATIVE_BLOCK_1[..]).unwrap();
-        let block_2_side = Block::<Tx>::read(&ALTERNATIVE_BLOCK_2[..]).unwrap();
+        let block_1_canon = Block::<Testnet1Transaction>::read_le(&BLOCK_1[..]).unwrap();
+        let block_2_canon = Block::<Testnet1Transaction>::read_le(&BLOCK_2[..]).unwrap();
+        let block_1_side = Block::<Testnet1Transaction>::read_le(&ALTERNATIVE_BLOCK_1[..]).unwrap();
+        let block_2_side = Block::<Testnet1Transaction>::read_le(&ALTERNATIVE_BLOCK_2[..]).unwrap();
 
         // 1. Receive irrelevant block.
 
@@ -165,7 +165,7 @@ mod consensus_sidechain {
         let consensus = snarkos_testing::sync::create_test_consensus();
 
         // Introduce one block.
-        let block_1 = Block::<Tx>::read(&BLOCK_1[..]).unwrap();
+        let block_1 = Block::<Testnet1Transaction>::read_le(&BLOCK_1[..]).unwrap();
         consensus.receive_block(&block_1, false).await.unwrap();
 
         // Verify that the best block number is the same as the block height.
@@ -174,7 +174,7 @@ mod consensus_sidechain {
         assert_eq!(best_block_number, block_height);
 
         // Introduce another block.
-        let block_2 = Block::<Tx>::read(&BLOCK_2[..]).unwrap();
+        let block_2 = Block::<Testnet1Transaction>::read_le(&BLOCK_2[..]).unwrap();
         consensus.receive_block(&block_2, false).await.unwrap();
 
         // Verify that the best block number is the same as the block height.

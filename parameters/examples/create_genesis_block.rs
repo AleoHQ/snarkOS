@@ -17,14 +17,14 @@
 use snarkos_parameters::transaction_1::Transaction1;
 
 use snarkvm_dpc::{
-    testnet1::{instantiated::Components, transaction::Transaction as DPCTransaction, BaseDPCComponents},
+    testnet1::{instantiated::Components, Testnet1Components, Transaction},
     BlockHeader,
     BlockHeaderHash,
     MerkleRootHash,
     PedersenMerkleRootHash,
     ProofOfSuccinctWork,
     TransactionError,
-    Transactions as DPCTransactions,
+    Transactions,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::bytes::FromBytes;
@@ -36,11 +36,11 @@ use std::{
     path::PathBuf,
 };
 
-pub fn generate<C: BaseDPCComponents>() -> Result<Vec<u8>, TransactionError> {
+pub fn generate<C: Testnet1Components>() -> Result<Vec<u8>, TransactionError> {
     // Add transactions to block
-    let mut transactions = DPCTransactions::new();
+    let mut transactions = Transactions::new();
 
-    let transaction_1 = DPCTransaction::<C>::read(Transaction1::load_bytes().as_slice())?;
+    let transaction_1 = Transaction::<C>::read_le(Transaction1::load_bytes().as_slice())?;
     transactions.push(transaction_1);
 
     let genesis_header = BlockHeader {

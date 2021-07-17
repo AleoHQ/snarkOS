@@ -16,10 +16,10 @@
 
 use crate::{message::*, NetworkError, Node};
 use snarkos_consensus::memory_pool::Entry;
-use snarkvm_dpc::{testnet1::instantiated::Tx, Storage};
+use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, Storage};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use std::net::SocketAddr;
@@ -69,7 +69,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         source: SocketAddr,
         transaction: Vec<u8>,
     ) -> Result<(), NetworkError> {
-        if let Ok(tx) = Tx::read(&*transaction) {
+        if let Ok(tx) = Testnet1Transaction::read_le(&*transaction) {
             let insertion = {
                 let storage = self.expect_sync().storage();
 
@@ -83,7 +83,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
                     return Ok(());
                 }
 
-                let entry = Entry::<Tx> {
+                let entry = Entry::<Testnet1Transaction> {
                     size_in_bytes: transaction.len(),
                     transaction: tx,
                 };
@@ -109,7 +109,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
             let mut txs = vec![];
 
             for entry in self.expect_sync().memory_pool().transactions.inner().values() {
-                if let Ok(transaction_bytes) = to_bytes![entry.transaction] {
+                if let Ok(transaction_bytes) = to_bytes_le![entry.transaction] {
                     txs.push(transaction_bytes);
                 }
             }
@@ -131,8 +131,8 @@ impl<S: Storage + Send + core::marker::Sync + 'static> Node<S> {
         let storage = self.expect_sync().storage();
 
         for transaction_bytes in transactions {
-            let transaction: Tx = Tx::read(&transaction_bytes[..])?;
-            let entry = Entry::<Tx> {
+            let transaction: Testnet1Transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
+            let entry = Entry::<Testnet1Transaction> {
                 size_in_bytes: transaction_bytes.len(),
                 transaction,
             };

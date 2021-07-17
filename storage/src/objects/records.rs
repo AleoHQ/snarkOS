@@ -19,7 +19,7 @@ use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, RecordScheme, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 // TODO (howardwu): Remove this from `Ledger` as it is not used for ledger state.
@@ -46,7 +46,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     pub fn get_record<R: RecordScheme>(&self, record_commitment: &[u8]) -> Result<Option<R>, StorageError> {
         match self.storage.get(COL_RECORDS, record_commitment)? {
             Some(record_bytes) => {
-                let record: R = FromBytes::read(&record_bytes[..])?;
+                let record: R = FromBytes::read_le(&record_bytes[..])?;
                 Ok(Some(record))
             }
             None => Ok(None),
@@ -59,8 +59,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         database_transaction.push(Op::Insert {
             col: COL_RECORDS,
-            key: to_bytes![record.commitment()]?.to_vec(),
-            value: to_bytes![record]?.to_vec(),
+            key: to_bytes_le![record.commitment()]?.to_vec(),
+            value: to_bytes_le![record]?.to_vec(),
         });
 
         self.storage.batch(database_transaction)
@@ -73,8 +73,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         for record in records {
             database_transaction.push(Op::Insert {
                 col: COL_RECORDS,
-                key: to_bytes![record.commitment()]?.to_vec(),
-                value: to_bytes![record]?.to_vec(),
+                key: to_bytes_le![record.commitment()]?.to_vec(),
+                value: to_bytes_le![record]?.to_vec(),
             });
         }
 
@@ -87,7 +87,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         database_transaction.push(Op::Delete {
             col: COL_RECORDS,
-            key: to_bytes![record.commitment()]?.to_vec(),
+            key: to_bytes_le![record.commitment()]?.to_vec(),
         });
 
         self.storage.batch(database_transaction)

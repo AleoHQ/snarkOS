@@ -127,7 +127,11 @@ pub trait ProtectedRpcFunctions {
 
     // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/createtransaction.md"))]
-    fn create_transaction(&self, transaction_kernel: String) -> Result<CreateRawTransactionOuput, RpcError>;
+    fn create_transaction(
+        &self,
+        private_keys: [String; 2], // TODO (howardwu): Genericize this.
+        transaction_kernel: String,
+    ) -> Result<CreateRawTransactionOuput, RpcError>;
 
     // todo: readd in Rust 1.54
     // #[cfg_attr(nightly, doc(include = "../documentation/private_endpoints/getrecordcommitments.md"))]

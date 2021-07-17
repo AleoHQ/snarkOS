@@ -17,7 +17,7 @@
 use std::{sync::Arc, thread, time::Duration};
 
 use futures::executor::block_on;
-use snarkvm_dpc::{testnet1::instantiated::*, AccountAddress, Storage};
+use snarkvm_dpc::{testnet1::instantiated::*, Address, Storage};
 use tokio::task;
 use tracing::*;
 
@@ -28,13 +28,13 @@ use crate::{Node, State};
 
 /// Parameters for spawning a miner that runs proof of work to find a block.
 pub struct MinerInstance<S: Storage + core::marker::Sync + Send + 'static> {
-    miner_address: AccountAddress<Components>,
+    miner_address: Address<Components>,
     node: Node<S>,
 }
 
 impl<S: Storage + Send + Sync + 'static> MinerInstance<S> {
     /// Creates a new MinerInstance for spawning miners.
-    pub fn new(miner_address: AccountAddress<Components>, node: Node<S>) -> Self {
+    pub fn new(miner_address: Address<Components>, node: Node<S>) -> Self {
         Self { miner_address, node }
     }
 

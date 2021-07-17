@@ -41,7 +41,7 @@ async fn import_export_blocks() {
     let mut imported_blocks = io::Cursor::new(fs::read(&path).unwrap());
 
     for test_block in test_blocks {
-        let imported_block: Block<_> = FromBytes::read(&mut imported_blocks).unwrap();
+        let imported_block: Block<_> = FromBytes::read_le(&mut imported_blocks).unwrap();
         assert_eq!(imported_block, test_block);
     }
 

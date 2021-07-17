@@ -17,14 +17,14 @@
 mod consensus_integration {
     use snarkos_consensus::miner::Miner;
     use snarkos_testing::sync::*;
-    use snarkvm_dpc::{block::Transactions as DPCTransactions, testnet1::instantiated::Tx, BlockHeader};
+    use snarkvm_dpc::{block::Transactions, testnet1::instantiated::Testnet1Transaction, BlockHeader};
     use snarkvm_posw::txids_to_roots;
 
     use std::sync::Arc;
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
-    fn test_find_block(transactions: &DPCTransactions<Tx>, parent_header: &BlockHeader) {
+    fn test_find_block(transactions: &Transactions<Testnet1Transaction>, parent_header: &BlockHeader) {
         let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
         let miner_address = FIXTURE_VK.test_accounts[0].address.clone();
         let miner = Miner::new(miner_address, consensus.clone());
@@ -49,7 +49,7 @@ mod consensus_integration {
 
     #[tokio::test]
     async fn find_valid_block() {
-        let transactions = DPCTransactions(vec![
+        let transactions = Transactions(vec![
             DATA.block_1.transactions.0[0].clone(),
             DATA.block_2.transactions.0[0].clone(),
         ]);

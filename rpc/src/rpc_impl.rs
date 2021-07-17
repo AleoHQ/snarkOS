@@ -23,17 +23,14 @@ use snarkos_consensus::{get_block_reward, memory_pool::Entry, ConsensusParameter
 use snarkos_metrics::{snapshots::NodeStats, stats::NODE_STATS};
 use snarkos_network::{KnownNetwork, NetworkMetrics, Node, Sync};
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Tx},
-        parameters::PublicParameters,
-    },
+    testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
     BlockHeaderHash,
     Storage,
     TransactionScheme,
 };
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
     CanonicalSerialize,
 };
 
@@ -84,11 +81,11 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcImpl<S> {
         Ok(self.sync_handler()?.consensus_parameters())
     }
 
-    pub fn dpc_parameters(&self) -> Result<&PublicParameters<Components>, RpcError> {
+    pub fn dpc(&self) -> Result<&Testnet1DPC, RpcError> {
         Ok(self.sync_handler()?.dpc_parameters())
     }
 
-    pub fn memory_pool(&self) -> Result<&MemoryPool<Tx>, RpcError> {
+    pub fn memory_pool(&self) -> Result<&MemoryPool<Testnet1Transaction>, RpcError> {
         Ok(self.sync_handler()?.memory_pool())
     }
 
@@ -197,7 +194,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let primary_height = self.sync_handler()?.current_block_height();
         self.storage.catch_up_secondary(false, primary_height)?;
         let transaction_bytes = hex::decode(transaction_bytes)?;
-        let transaction = Tx::read(&transaction_bytes[..])?;
+        let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
 
         let mut old_serial_numbers = Vec::with_capacity(transaction.old_serial_numbers().len());
 
@@ -210,20 +207,20 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
         let mut new_commitments = Vec::with_capacity(transaction.new_commitments().len());
 
         for cm in transaction.new_commitments() {
-            new_commitments.push(hex::encode(to_bytes![cm]?));
+            new_commitments.push(hex::encode(to_bytes_le![cm]?));
         }
 
-        let memo = hex::encode(to_bytes![transaction.memorandum()]?);
+        let memo = hex::encode(to_bytes_le![transaction.memorandum()]?);
 
         let mut signatures = Vec::with_capacity(transaction.signatures.len());
         for sig in &transaction.signatures {
-            signatures.push(hex::encode(to_bytes![sig]?));
+            signatures.push(hex::encode(to_bytes_le![sig]?));
         }
 
         let mut encrypted_records = Vec::with_capacity(transaction.encrypted_records.len());
 
         for encrypted_record in &transaction.encrypted_records {
-            encrypted_records.push(hex::encode(to_bytes![encrypted_record]?));
+            encrypted_records.push(hex::encode(to_bytes_le![encrypted_record]?));
         }
 
         let transaction_id = transaction.transaction_id()?;
@@ -244,10 +241,10 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
             new_commitments,
             memo,
             network_id: transaction.network.id(),
-            digest: hex::encode(to_bytes![transaction.ledger_digest]?),
-            transaction_proof: hex::encode(to_bytes![transaction.transaction_proof]?),
-            program_commitment: hex::encode(to_bytes![transaction.program_commitment]?),
-            local_data_root: hex::encode(to_bytes![transaction.local_data_root]?),
+            digest: hex::encode(to_bytes_le![transaction.ledger_digest]?),
+            transaction_proof: hex::encode(to_bytes_le![transaction.transaction_proof]?),
+            program_commitment: hex::encode(to_bytes_le![transaction.program_commitment]?),
+            local_data_root: hex::encode(to_bytes_le![transaction.local_data_root]?),
             value_balance: transaction.value_balance.0,
             signatures,
             encrypted_records,
@@ -260,7 +257,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Returns the transaction id if valid.
     fn send_raw_transaction(&self, transaction_bytes: String) -> Result<String, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
-        let transaction = Tx::read(&transaction_bytes[..])?;
+        let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
         let transaction_hex_id = hex::encode(transaction.transaction_id()?);
 
         let storage = &self.storage;
@@ -275,7 +272,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
 
         match !storage.transaction_conflicts(&transaction) {
             true => {
-                let entry = Entry::<Tx> {
+                let entry = Entry::<Testnet1Transaction> {
                     size_in_bytes: transaction_bytes.len(),
                     transaction,
                 };
@@ -307,7 +304,7 @@ impl<S: Storage + Send + core::marker::Sync + 'static> RpcFunctions for RpcImpl<
     /// Validate and return if the transaction is valid.
     fn validate_raw_transaction(&self, transaction_bytes: String) -> Result<bool, RpcError> {
         let transaction_bytes = hex::decode(transaction_bytes)?;
-        let transaction = Tx::read(&transaction_bytes[..])?;
+        let transaction = Testnet1Transaction::read_le(&transaction_bytes[..])?;
 
         let storage = &self.storage;
 

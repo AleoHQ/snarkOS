@@ -32,7 +32,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     /// Get a block header given the block hash.
     pub fn get_block_header(&self, block_hash: &BlockHeaderHash) -> Result<BlockHeader, StorageError> {
         match self.storage.get(COL_BLOCK_HEADER, &block_hash.0)? {
-            Some(block_header_bytes) => Ok(BlockHeader::read(&block_header_bytes[..])?),
+            Some(block_header_bytes) => Ok(BlockHeader::read_le(&block_header_bytes[..])?),
             None => Err(StorageError::MissingBlockHeader(block_hash.to_string())),
         }
     }

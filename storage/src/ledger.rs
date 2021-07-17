@@ -51,10 +51,10 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
             Self::open_at_path(path)
         } else {
-            let crh = P::H::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
+            let crh = P::H::from(FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
             let ledger_parameters = Arc::new(P::from(crh));
 
-            let genesis_block: Block<T> = FromBytes::read(GenesisBlock::load_bytes().as_slice())?;
+            let genesis_block: Block<T> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
 
             Ok(Self::new(None, ledger_parameters, genesis_block).expect("Ledger could not be instantiated"))
         }
@@ -130,7 +130,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             storage.get(COL_META, KEY_BEST_BLOCK_NUMBER.as_bytes())?
         };
 
-        let crh = P::H::from(FromBytes::read(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
+        let crh = P::H::from(FromBytes::read_le(&LedgerMerkleTreeParameters::load_bytes()?[..])?);
         let ledger_parameters = Arc::new(P::from(crh));
 
         match latest_block_number {
@@ -147,7 +147,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 let cms = storage.get_col(COL_COMMITMENT)?;
 
                 for (commitment_key, index_value) in cms {
-                    let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
+                    let commitment: T::Commitment = FromBytes::read_le(&commitment_key[..])?;
                     let index = bytes_to_u32(&index_value) as usize;
 
                     cm_and_indices.push((commitment, index));
@@ -169,7 +169,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             None => {
                 // Add genesis block to database
 
-                let genesis_block: Block<T> = FromBytes::read(GenesisBlock::load_bytes().as_slice())?;
+                let genesis_block: Block<T> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice())?;
 
                 let ledger_storage = Self::new(Some(path.as_ref()), ledger_parameters, genesis_block)
                     .expect("Ledger could not be instantiated");

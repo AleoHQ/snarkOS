@@ -24,11 +24,11 @@ mod rpc_tests {
         network::{test_config, ConsensusSetup, TestSetup},
         sync::*,
     };
-    use snarkvm_dpc::{testnet1::instantiated::Tx, TransactionScheme};
+    use snarkvm_dpc::{testnet1::instantiated::Testnet1Transaction, TransactionScheme};
     use snarkvm_utilities::{
         bytes::{FromBytes, ToBytes},
         serialize::CanonicalSerialize,
-        to_bytes,
+        to_bytes_le,
     };
 
     use jsonrpc_test::Rpc;
@@ -53,7 +53,7 @@ mod rpc_tests {
     }
 
     fn verify_transaction_info(transaction_bytes: Vec<u8>, transaction_info: Value) {
-        let transaction = Tx::read(&transaction_bytes[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&transaction_bytes[..]).unwrap();
 
         let transaction_id = hex::encode(transaction.transaction_id().unwrap());
         let transaction_size = transaction_bytes.len();
@@ -69,26 +69,26 @@ mod rpc_tests {
         let new_commitments: Vec<Value> = transaction
             .new_commitments()
             .iter()
-            .map(|cm| Value::String(hex::encode(to_bytes![cm].unwrap())))
+            .map(|cm| Value::String(hex::encode(to_bytes_le![cm].unwrap())))
             .collect();
         let memo = hex::encode(transaction.memorandum());
         let network_id = transaction.network.id();
 
-        let digest = hex::encode(to_bytes![transaction.ledger_digest].unwrap());
-        let transaction_proof = hex::encode(to_bytes![transaction.transaction_proof].unwrap());
-        let program_commitment = hex::encode(to_bytes![transaction.program_commitment()].unwrap());
-        let local_data_root = hex::encode(to_bytes![transaction.local_data_root].unwrap());
+        let digest = hex::encode(to_bytes_le![transaction.ledger_digest].unwrap());
+        let transaction_proof = hex::encode(to_bytes_le![transaction.transaction_proof].unwrap());
+        let program_commitment = hex::encode(to_bytes_le![transaction.program_commitment()].unwrap());
+        let local_data_root = hex::encode(to_bytes_le![transaction.local_data_root].unwrap());
         let value_balance = transaction.value_balance;
         let signatures: Vec<Value> = transaction
             .signatures
             .iter()
-            .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
+            .map(|s| Value::String(hex::encode(to_bytes_le![s].unwrap())))
             .collect();
 
         let encrypted_records: Vec<Value> = transaction
             .encrypted_records
             .iter()
-            .map(|s| Value::String(hex::encode(to_bytes![s].unwrap())))
+            .map(|s| Value::String(hex::encode(to_bytes_le![s].unwrap())))
             .collect();
 
         assert_eq!(transaction_id, transaction_info["txid"]);
@@ -200,7 +200,7 @@ mod rpc_tests {
 
         assert_eq!(rpc.request("getrawtransaction", &[transaction_id]), format![
             r#""{}""#,
-            hex::encode(to_bytes![transaction].unwrap())
+            hex::encode(to_bytes_le![transaction].unwrap())
         ]);
     }
 
@@ -218,7 +218,7 @@ mod rpc_tests {
 
         let transaction_info: Value = serde_json::from_str(&response).unwrap();
 
-        verify_transaction_info(to_bytes![transaction].unwrap(), transaction_info);
+        verify_transaction_info(to_bytes_le![transaction].unwrap(), transaction_info);
     }
 
     #[tokio::test]
@@ -239,7 +239,7 @@ mod rpc_tests {
         let storage = Arc::new(FIXTURE_VK.ledger());
         let rpc = initialize_test_rpc(storage).await;
 
-        let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+        let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
 
         assert_eq!(
             rpc.request("sendtransaction", &[hex::encode(TRANSACTION_1.to_vec())]),

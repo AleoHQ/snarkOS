@@ -117,7 +117,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
 
         let mut target_file = BufWriter::new(fs::File::create(location)?);
         for (_block_number, block) in &blocks {
-            block.write(&mut target_file)?;
+            block.write_le(&mut target_file)?;
         }
 
         Ok(blocks.len())

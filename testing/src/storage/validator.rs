@@ -53,7 +53,7 @@ async fn validator_vs_a_missing_serial_number() {
 
     assert!(!consensus.ledger.validate(None, FixMode::Nothing));
     // Currently unsupported.
-    // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+    // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
 
 #[tokio::test]
@@ -77,7 +77,7 @@ async fn validator_vs_a_missing_commitment() {
 
     assert!(!consensus.ledger.validate(None, FixMode::Nothing));
     // Currently unsupported
-    // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+    // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
 
 #[tokio::test]
@@ -101,7 +101,7 @@ async fn validator_vs_a_missing_memorandum() {
 
     assert!(!consensus.ledger.validate(None, FixMode::Nothing));
     // Currently unsupported
-    // assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+    // assert!(consensus.ledger.validate(None, FixMode::MissingTestnet1TransactionComponents));
 }
 
 #[tokio::test]
@@ -124,7 +124,11 @@ async fn validator_vs_a_missing_digest() {
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
     assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::MissingTxComponents));
+    assert!(
+        consensus
+            .ledger
+            .validate(None, FixMode::MissingTestnet1TransactionComponents)
+    );
 }
 
 #[tokio::test]
@@ -152,7 +156,11 @@ async fn validator_vs_a_superfluous_serial_number() {
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
     assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    assert!(
+        consensus
+            .ledger
+            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+    );
 }
 
 #[tokio::test]
@@ -180,7 +188,11 @@ async fn validator_vs_a_superfluous_commitment() {
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
     assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    assert!(
+        consensus
+            .ledger
+            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+    );
 }
 
 #[tokio::test]
@@ -208,7 +220,11 @@ async fn validator_vs_a_superfluous_memorandum() {
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
     assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    assert!(
+        consensus
+            .ledger
+            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+    );
 }
 
 #[tokio::test]
@@ -230,7 +246,11 @@ async fn validator_vs_a_superfluous_digest() {
     consensus.ledger.storage.batch(database_transaction).unwrap();
 
     assert!(!consensus.ledger.validate(None, FixMode::Nothing));
-    assert!(consensus.ledger.validate(None, FixMode::SuperfluousTxComponents));
+    assert!(
+        consensus
+            .ledger
+            .validate(None, FixMode::SuperfluousTestnet1TransactionComponents)
+    );
 }
 
 #[ignore]

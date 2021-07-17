@@ -19,7 +19,7 @@ use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{errors::StorageError, DatabaseTransaction, Op, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use std::{collections::HashSet, sync::Arc};
@@ -53,7 +53,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     pub fn current_digest(&self) -> Result<Vec<u8>, StorageError> {
         match self.storage.get(COL_META, KEY_CURR_DIGEST.as_bytes())? {
             Some(current_digest) => Ok(current_digest),
-            None => Ok(to_bytes![self.cm_merkle_tree.load().root()].unwrap()),
+            None => Ok(to_bytes_le![self.cm_merkle_tree.load().root()].unwrap()),
         }
     }
 
@@ -110,7 +110,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         let mut old_cm_and_indices = vec![];
         for (commitment_key, index_value) in self.storage.get_col(COL_COMMITMENT)? {
-            let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
+            let commitment: T::Commitment = FromBytes::read_le(&commitment_key[..])?;
             let index = bytes_to_u32(&index_value) as usize;
 
             old_cm_and_indices.push((commitment, index));
@@ -138,13 +138,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
-            key: to_bytes![new_digest]?,
+            key: to_bytes_le![new_digest]?,
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
         database_transaction.push(Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes![new_digest]?,
+            value: to_bytes_le![new_digest]?,
         });
 
         self.storage.batch(database_transaction)

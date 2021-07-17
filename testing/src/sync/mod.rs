@@ -20,7 +20,7 @@ use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{testnet1::instantiated::Components, DPCComponents, Network, TransactionError, TransactionScheme};
 use snarkvm_parameters::{global::InnerCircuitIDCRH, testnet1::InnerSNARKVKParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use once_cell::sync::Lazy;
 use std::{
@@ -35,12 +35,12 @@ mod fixture;
 pub use fixture::*;
 
 pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
-    let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerCircuitIDCRH as CRH>::Parameters = FromBytes::read(InnerCircuitIDCRH::load_bytes().unwrap().as_slice()).unwrap();
+    let inner_snark_verification_key_crh_parameters: <<Components as DPCComponents>::InnerCircuitIDCRH as CRH>::Parameters = FromBytes::read_le(InnerCircuitIDCRH::load_bytes().unwrap().as_slice()).unwrap();
 
     let inner_snark_verification_key_crh: <Components as DPCComponents>::InnerCircuitIDCRH =
         From::from(inner_snark_verification_key_crh_parameters);
 
-    let inner_snark_id = to_bytes![
+    let inner_snark_id = to_bytes_le![
         inner_snark_verification_key_crh
             .hash(&InnerSNARKVKParameters::load_bytes().unwrap())
             .unwrap()
@@ -51,16 +51,16 @@ pub static TEST_CONSENSUS_PARAMS: Lazy<ConsensusParameters> = Lazy::new(|| {
         max_block_size: 1_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 2i64, //unix seconds
-        network_id: Network::Mainnet,
+        network_id: Network::Testnet1,
         verifier: PoswMarlin::verify_only().unwrap(),
         authorized_inner_snark_ids: vec![inner_snark_id],
     }
 });
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TestTx;
+pub struct TestTestnet1Transaction;
 
-impl TransactionScheme for TestTx {
+impl TransactionScheme for TestTestnet1Transaction {
     type Commitment = [u8; 32];
     type Digest = [u8; 32];
     type EncryptedRecord = [u8; 32];
@@ -69,6 +69,7 @@ impl TransactionScheme for TestTx {
     type Memorandum = [u8; 32];
     type ProgramCommitment = [u8; 32];
     type SerialNumber = [u8; 32];
+    type Signature = [u8; 32];
     type ValueBalance = i64;
 
     fn transaction_id(&self) -> Result<[u8; 32], TransactionError> {
@@ -88,11 +89,11 @@ impl TransactionScheme for TestTx {
     }
 
     fn old_serial_numbers(&self) -> &[Self::SerialNumber] {
-        &[[0u8; 32]]
+        &[[0u8; 32]; 2]
     }
 
     fn new_commitments(&self) -> &[Self::Commitment] {
-        &[[0u8; 32]]
+        &[[0u8; 32]; 2]
     }
 
     fn program_commitment(&self) -> &Self::ProgramCommitment {
@@ -111,8 +112,12 @@ impl TransactionScheme for TestTx {
         &[0u8; 32]
     }
 
+    fn signatures(&self) -> &[Self::Signature] {
+        &[[0u8; 32]; 2]
+    }
+
     fn encrypted_records(&self) -> &[Self::EncryptedRecord] {
-        &[[0u8; 32]]
+        &[[0u8; 32]; 2]
     }
 
     fn size(&self) -> usize {
@@ -120,16 +125,16 @@ impl TransactionScheme for TestTx {
     }
 }
 
-impl ToBytes for TestTx {
+impl ToBytes for TestTestnet1Transaction {
     #[inline]
-    fn write<W: Write>(&self, mut _writer: W) -> IoResult<()> {
+    fn write_le<W: Write>(&self, mut _writer: W) -> IoResult<()> {
         Ok(())
     }
 }
 
-impl FromBytes for TestTx {
+impl FromBytes for TestTestnet1Transaction {
     #[inline]
-    fn read<R: Read>(mut _reader: R) -> IoResult<Self> {
+    fn read_le<R: Read>(mut _reader: R) -> IoResult<Self> {
         Ok(Self)
     }
 }
@@ -145,6 +150,6 @@ pub fn create_test_consensus_from_ledger(
         ledger,
         memory_pool: Default::default(),
         parameters: TEST_CONSENSUS_PARAMS.clone(),
-        public_parameters: FIXTURE.parameters.clone(),
+        dpc: FIXTURE.dpc.clone(),
     }
 }

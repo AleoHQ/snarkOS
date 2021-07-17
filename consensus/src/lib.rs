@@ -59,15 +59,13 @@ pub use parameters::*;
 
 use snarkos_storage::Ledger;
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{CommitmentMerkleParameters, Tx},
-        transaction::amount::AleoAmount,
-    },
+    testnet1::instantiated::{CommitmentMerkleParameters, Testnet1Transaction},
+    AleoAmount,
     BlockHeader,
     BlockHeaderHash,
 };
 
-pub type MerkleTreeLedger<S> = Ledger<Tx, CommitmentMerkleParameters, S>;
+pub type MerkleTreeLedger<S> = Ledger<Testnet1Transaction, CommitmentMerkleParameters, S>;
 
 /// Calculate a block reward that halves every 4 years * 365 days * 24 hours * 100 blocks/hr = 3,504,000 blocks.
 pub fn get_block_reward(block_num: u32) -> AleoAmount {

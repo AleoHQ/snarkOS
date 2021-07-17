@@ -15,13 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_testing::sync::*;
-use snarkvm_dpc::{block::Transactions as DPCTransactions, merkle_root};
+use snarkvm_dpc::{block::Transactions, merkle_root};
 use snarkvm_posw::txids_to_roots;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
 fn bench_txids_to_roots(c: &mut Criterion) {
-    let transactions = DPCTransactions(vec![TestTx; 200]);
+    let transactions = Transactions(vec![TestTestnet1Transaction; 200]);
 
     c.bench_function("txids_to_roots", |b| {
         b.iter(|| txids_to_roots(&transactions.to_transaction_ids().unwrap()))

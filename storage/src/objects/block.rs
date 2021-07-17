@@ -25,9 +25,9 @@ use snarkvm_dpc::{
     Storage,
     StorageError,
     TransactionScheme,
-    Transactions as DPCTransactions,
+    Transactions,
 };
-use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, FromBytes, ToBytes};
 
 use std::sync::atomic::Ordering;
 
@@ -73,9 +73,9 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     }
 
     /// Get the list of transaction ids given a block hash.
-    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<DPCTransactions<T>, StorageError> {
+    pub fn get_block_transactions(&self, block_hash: &BlockHeaderHash) -> Result<Transactions<T>, StorageError> {
         match self.storage.get(COL_BLOCK_TRANSACTIONS, &block_hash.0)? {
-            Some(encoded_block_transactions) => Ok(DPCTransactions::read(&encoded_block_transactions[..])?),
+            Some(encoded_block_transactions) => Ok(Transactions::read_le(&encoded_block_transactions[..])?),
             None => Err(StorageError::MissingBlockTransactions(block_hash.to_string())),
         }
     }
@@ -189,7 +189,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             for sn in transaction.old_serial_numbers() {
                 database_transaction.push(Op::Delete {
                     col: COL_SERIAL_NUMBER,
-                    key: to_bytes![sn]?,
+                    key: to_bytes_le![sn]?,
                 });
                 sn_index -= 1;
             }
@@ -197,14 +197,14 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             for cm in transaction.new_commitments() {
                 database_transaction.push(Op::Delete {
                     col: COL_COMMITMENT,
-                    key: to_bytes![cm]?,
+                    key: to_bytes_le![cm]?,
                 });
                 cm_index -= 1;
             }
 
             database_transaction.push(Op::Delete {
                 col: COL_MEMO,
-                key: to_bytes![transaction.memorandum()]?,
+                key: to_bytes_le![transaction.memorandum()]?,
             });
             memo_index -= 1;
         }

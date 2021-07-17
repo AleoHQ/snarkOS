@@ -18,15 +18,16 @@ mod consensus_dpc {
     use snarkos_consensus::{get_block_reward, Miner};
     use snarkos_testing::sync::*;
     use snarkvm_dpc::{
-        testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record as DPCRecord},
+        testnet1::{instantiated::*, payload::Payload as RecordPayload, record::Record},
         Block,
+        DPCComponents,
         DPCScheme,
         LedgerScheme,
         ProgramScheme,
         RecordScheme,
-        Transactions as DPCTransactions,
+        Transactions,
     };
-    use snarkvm_utilities::{bytes::ToBytes, to_bytes};
+    use snarkvm_utilities::{bytes::ToBytes, to_bytes_le};
 
     use std::sync::Arc;
 
@@ -40,15 +41,16 @@ mod consensus_dpc {
         let miner = Miner::new(miner_acc.address, consensus.clone());
 
         println!("Creating block with coinbase transaction");
-        let transactions = DPCTransactions::<Tx>::new();
+        let transactions = Transactions::<Testnet1Transaction>::new();
         let (previous_block_header, transactions, coinbase_records) = miner.establish_block(&transactions).unwrap();
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
         let block = Block { header, transactions };
 
-        assert!(
-            InstantiatedDPC::verify_transactions(&consensus.public_parameters, &block.transactions, &*consensus.ledger)
-                .unwrap()
-        );
+        assert!(Testnet1DPC::verify_transactions(
+            &consensus.dpc,
+            &block.transactions,
+            &*consensus.ledger
+        ));
 
         let block_reward = get_block_reward(consensus.ledger.len() as u32);
 
@@ -67,17 +69,17 @@ mod consensus_dpc {
 
         // INPUTS
 
-        let old_account_private_keys = vec![miner_acc.private_key; NUM_INPUT_RECORDS];
+        let old_account_private_keys = vec![miner_acc.private_key; Components::NUM_INPUT_RECORDS];
         let old_records = coinbase_records;
-        let new_birth_program_ids = vec![program.into_compact_repr(); NUM_INPUT_RECORDS];
+        let new_birth_program_ids = vec![program.id(); Components::NUM_INPUT_RECORDS];
 
         // OUTPUTS
 
-        let new_record_owners = vec![recipient.address; NUM_OUTPUT_RECORDS];
-        let new_death_program_ids = vec![program.into_compact_repr(); NUM_OUTPUT_RECORDS];
-        let new_is_dummy_flags = vec![false; NUM_OUTPUT_RECORDS];
-        let new_values = vec![10; NUM_OUTPUT_RECORDS];
-        let new_payloads = vec![RecordPayload::default(); NUM_OUTPUT_RECORDS];
+        let new_record_owners = vec![recipient.address; Components::NUM_OUTPUT_RECORDS];
+        let new_death_program_ids = vec![program.id(); Components::NUM_OUTPUT_RECORDS];
+        let new_is_dummy_flags = vec![false; Components::NUM_OUTPUT_RECORDS];
+        let new_values = vec![10; Components::NUM_OUTPUT_RECORDS];
+        let new_payloads = vec![RecordPayload::default(); Components::NUM_OUTPUT_RECORDS];
 
         // Memo is a dummy for now
 
@@ -107,17 +109,18 @@ mod consensus_dpc {
         assert_eq!(spend_records[1].value(), 10);
         assert_eq!(transaction.value_balance.0, (block_reward.0 - 20) as i64);
 
-        assert!(InstantiatedDPC::verify(&consensus.public_parameters, &transaction, &*consensus.ledger).unwrap());
+        assert!(Testnet1DPC::verify(&consensus.dpc, &transaction, &*consensus.ledger));
 
         println!("Create a new block with the payment transaction");
-        let mut transactions = DPCTransactions::new();
+        let mut transactions = Transactions::new();
         transactions.push(transaction);
         let (previous_block_header, transactions, new_coinbase_records) = miner.establish_block(&transactions).unwrap();
 
-        assert!(
-            InstantiatedDPC::verify_transactions(&consensus.public_parameters, &transactions, &*consensus.ledger)
-                .unwrap()
-        );
+        assert!(Testnet1DPC::verify_transactions(
+            &consensus.dpc,
+            &transactions,
+            &*consensus.ledger
+        ));
 
         let header = miner.find_block(&transactions, &previous_block_header).unwrap();
         let new_block = Block { header, transactions };
@@ -141,14 +144,14 @@ mod consensus_dpc {
         for record in &new_coinbase_records {
             consensus.ledger.store_record(record).unwrap();
 
-            let reconstruct_record: Option<DPCRecord<Components>> = consensus
+            let reconstruct_record: Option<Record<Components>> = consensus
                 .ledger
-                .get_record(&to_bytes![record.commitment()].unwrap().to_vec())
+                .get_record(&to_bytes_le![record.commitment()].unwrap().to_vec())
                 .unwrap();
 
             assert_eq!(
-                to_bytes![reconstruct_record.unwrap()].unwrap(),
-                to_bytes![record].unwrap()
+                to_bytes_le![reconstruct_record.unwrap()].unwrap(),
+                to_bytes_le![record].unwrap()
             );
         }
     }

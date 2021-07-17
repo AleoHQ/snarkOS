@@ -16,7 +16,7 @@
 
 use snarkos_consensus::error::ConsensusError;
 use snarkvm_algorithms::errors::CRHError;
-use snarkvm_dpc::{AccountError, BlockError, DPCError, StorageError, TransactionError};
+use snarkvm_dpc::{AccountError, BlockError, DPCError, RecordError, StorageError, TransactionError};
 
 use std::fmt::Debug;
 
@@ -56,6 +56,9 @@ pub enum RpcError {
     NoKnownNetwork,
 
     #[error("{}", _0)]
+    RecordError(RecordError),
+
+    #[error("{}", _0)]
     StorageError(StorageError),
 
     #[error("{}", _0)]
@@ -89,6 +92,12 @@ impl From<CRHError> for RpcError {
 impl From<DPCError> for RpcError {
     fn from(error: DPCError) -> Self {
         RpcError::DPCError(error)
+    }
+}
+
+impl From<RecordError> for RpcError {
+    fn from(error: RecordError) -> Self {
+        RpcError::RecordError(error)
     }
 }
 
@@ -137,24 +146,6 @@ impl From<anyhow::Error> for RpcError {
 impl From<RpcError> for jsonrpc_core::Error {
     fn from(_error: RpcError) -> Self {
         jsonrpc_core::Error::invalid_request()
-    }
-}
-
-impl From<snarkos_toolkit::errors::AddressError> for RpcError {
-    fn from(error: snarkos_toolkit::errors::AddressError) -> Self {
-        RpcError::Crate("snarkos_toolkit::errors::address", format!("{:?}", error))
-    }
-}
-
-impl From<snarkos_toolkit::errors::DPCError> for RpcError {
-    fn from(error: snarkos_toolkit::errors::DPCError) -> Self {
-        RpcError::Crate("snarkos_toolkit::errors::dpc", format!("{:?}", error))
-    }
-}
-
-impl From<snarkos_toolkit::errors::PrivateKeyError> for RpcError {
-    fn from(error: snarkos_toolkit::errors::PrivateKeyError) -> Self {
-        RpcError::Crate("snarkos_toolkit::errors::privatekey", format!("{:?}", error))
     }
 }
 

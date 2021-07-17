@@ -35,7 +35,7 @@ use snarkvm_parameters::{LedgerMerkleTreeParameters, Parameter};
 use snarkvm_posw::PoswMarlin;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use rand::{thread_rng, Rng};
@@ -77,7 +77,7 @@ pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_na
         max_block_size: 1_000_000_000usize,
         max_nonce: u32::max_value(),
         target_block_time: 10i64,
-        network_id: Network::from_network_id(network_id),
+        network_id: Network::from_id(network_id),
         verifier: PoswMarlin::verify_only().expect("could not instantiate PoSW verifier"),
         authorized_inner_snark_ids: vec![],
     };
@@ -108,13 +108,13 @@ pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_na
         .public_parameters
         .system_parameters
         .program_verification_key_crh
-        .hash(&to_bytes![
+        .hash(&to_bytes_le![
             consensus
                 .public_parameters
                 .noop_program_snark_parameters
                 .verification_key
         ]?)?;
-    let noop_program_id = to_bytes![noop_program_vk_hash]?;
+    let noop_program_id = to_bytes_le![noop_program_vk_hash]?;
 
     // Generate a new account that owns the dummy input records
     let dummy_account = Account::new(
@@ -181,13 +181,13 @@ pub fn generate<S: Storage>(recipient: &str, value: u64, network_id: u8, file_na
         )
         .unwrap();
 
-    let transaction_bytes = to_bytes![transaction]?;
+    let transaction_bytes = to_bytes_le![transaction]?;
 
     let size = transaction_bytes.len();
     println!("{}\n\tsize - {}\n", file_name, size);
 
     for (i, record) in records.iter().enumerate() {
-        let record_bytes = to_bytes![record]?;
+        let record_bytes = to_bytes_le![record]?;
         println!("record {}: {:?}\n", i, hex::encode(record_bytes));
     }
 

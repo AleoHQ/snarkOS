@@ -25,7 +25,7 @@ use crate::{
 };
 use snarkvm_algorithms::traits::LoadableMerkleParameters;
 use snarkvm_dpc::{Block, BlockHeaderHash, DatabaseTransaction, LedgerScheme, Op, Storage, TransactionScheme};
-use snarkvm_utilities::{to_bytes, ToBytes};
+use snarkvm_utilities::{to_bytes_le, ToBytes};
 
 use parking_lot::Mutex;
 use rayon::prelude::*;
@@ -73,7 +73,12 @@ macro_rules! check_for_superfluous_tx_components {
                 );
 
                 if let Some(ref mut ops) = &mut *db_ops.lock() {
-                    if [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
+                    if [
+                        FixMode::SuperfluousTestnet1TransactionComponents,
+                        FixMode::Everything,
+                    ]
+                    .contains(&fix_mode)
+                    {
                         for superfluous_item in superfluous_items {
                             ops.push(Op::Delete {
                                 col: $component_col,
@@ -96,11 +101,11 @@ pub enum FixMode {
     /// Don't fix anything in the storage.
     Nothing,
     /// Update transaction locations if need be.
-    TxLocations,
+    Testnet1TransactionLocations,
     /// Store transaction serial numbers, commitments and memorandums that are missing in the storage.
-    MissingTxComponents,
+    MissingTestnet1TransactionComponents,
     /// Remove transaction serial numbers, commitments and memorandums for missing transactions.
-    SuperfluousTxComponents,
+    SuperfluousTestnet1TransactionComponents,
     /// Apply all the available fixes.
     Everything,
 }
@@ -120,7 +125,9 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
     /// it is likely that any issues are applicable only to the last few blocks. The `fix` argument determines whether
     /// the validation process should also attempt to fix the issues it encounters.
     pub fn validate(&self, mut limit: Option<u32>, fix_mode: FixMode) -> bool {
-        if limit.is_some() && [FixMode::SuperfluousTxComponents, FixMode::Everything].contains(&fix_mode) {
+        if limit.is_some()
+            && [FixMode::SuperfluousTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode)
+        {
             panic!(
                 "The validator can perform the specified fixes only if there is no limit on the number of blocks to process"
             );
@@ -364,7 +371,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             };
 
             let tx = match self.get_transaction_bytes(&tx_id) {
-                Ok(tx) => match T::read(&tx[..]) {
+                Ok(tx) => match T::read_le(&tx[..]) {
                     Ok(tx) => tx,
                     Err(e) => {
                         error!("Transaction {} can't be parsed: {}", hex::encode(tx_id), e);
@@ -393,7 +400,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
-                tx_sns.lock().insert(to_bytes!(sn).unwrap()); // to_bytes can't fail
+                tx_sns.lock().insert(to_bytes_le!(sn).unwrap()); // to_bytes can't fail
             }
 
             for cm in tx.new_commitments() {
@@ -404,22 +411,22 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                     );
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
-                tx_cms.lock().insert(to_bytes!(cm).unwrap()); // to_bytes can't fail
+                tx_cms.lock().insert(to_bytes_le!(cm).unwrap()); // to_bytes can't fail
             }
 
             let tx_digest = tx.ledger_digest();
             // to_bytes can't fail
-            if !self.storage.exists(COL_DIGEST, &to_bytes![tx_digest].unwrap()) {
+            if !self.storage.exists(COL_DIGEST, &to_bytes_le![tx_digest].unwrap()) {
                 warn!(
                     "Transaction {} doesn't have the ledger digest stored",
                     hex::encode(tx_id),
                 );
 
                 if let Some(ref mut db_ops) = &mut *database_fix.lock() {
-                    if [FixMode::MissingTxComponents, FixMode::Everything].contains(&fix_mode) {
+                    if [FixMode::MissingTestnet1TransactionComponents, FixMode::Everything].contains(&fix_mode) {
                         db_ops.push(Op::Insert {
                             col: COL_DIGEST,
-                            key: to_bytes![tx_digest].unwrap(), // to_bytes can't fail
+                            key: to_bytes_le![tx_digest].unwrap(), // to_bytes can't fail
                             value: block_height.to_le_bytes().to_vec(),
                         });
                     } else {
@@ -429,14 +436,14 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                     is_storage_valid.store(false, Ordering::SeqCst);
                 }
             }
-            tx_digests.lock().insert(to_bytes!(tx_digest).unwrap()); // to_bytes can't fail
+            tx_digests.lock().insert(to_bytes_le!(tx_digest).unwrap()); // to_bytes can't fail
 
             let tx_memo = tx.memorandum();
             if !self.contains_memo(tx_memo) {
                 error!("Transaction {} doesn't have its memo stored", hex::encode(tx_id));
                 is_storage_valid.store(false, Ordering::SeqCst);
             }
-            tx_memos.lock().insert(to_bytes!(tx_memo).unwrap()); // to_bytes can't fail
+            tx_memos.lock().insert(to_bytes_le!(tx_memo).unwrap()); // to_bytes can't fail
 
             match self.get_transaction_location(&tx_id) {
                 Ok(Some(tx_location)) => match self.get_block_number(&BlockHeaderHash(tx_location.block_hash)) {
@@ -459,7 +466,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                         );
 
                         if let Some(ref mut db_ops) = &mut *database_fix.lock() {
-                            if [FixMode::TxLocations, FixMode::Everything].contains(&fix_mode) {
+                            if [FixMode::Testnet1TransactionLocations, FixMode::Everything].contains(&fix_mode) {
                                 let corrected_location = TransactionLocation {
                                     index: block_tx_idx as u32,
                                     block_hash: block.header.get_hash().0,
@@ -468,7 +475,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
                                 db_ops.push(Op::Insert {
                                     col: COL_TRANSACTION_LOCATION,
                                     key: tx_id.to_vec(),
-                                    value: to_bytes!(corrected_location).unwrap(), // to_bytes can't fail
+                                    value: to_bytes_le!(corrected_location).unwrap(), // to_bytes_le can't fail
                                 });
                             } else {
                                 is_storage_valid.store(false, Ordering::SeqCst);

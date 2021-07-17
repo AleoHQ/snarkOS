@@ -25,7 +25,7 @@ use crate::{
 use snarkos_consensus::memory_pool::Entry;
 use snarkos_network::message::*;
 
-use snarkvm_dpc::{block_header_hash::BlockHeaderHash, testnet1::instantiated::Tx};
+use snarkvm_dpc::{block_header_hash::BlockHeaderHash, testnet1::instantiated::Testnet1Transaction};
 #[cfg(test)]
 use snarkvm_utilities::FromBytes;
 
@@ -247,12 +247,12 @@ async fn transaction_initiator_side() {
     // Create the entries to verify
     let entry_1 = Entry {
         size_in_bytes: TRANSACTION_1.len(),
-        transaction: Tx::read(&TRANSACTION_1[..]).unwrap(),
+        transaction: Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap(),
     };
 
     let entry_2 = Entry {
         size_in_bytes: TRANSACTION_2.len(),
-        transaction: Tx::read(&TRANSACTION_2[..]).unwrap(),
+        transaction: Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap(),
     };
 
     // Verify the transactions have been stored in the node's memory pool
@@ -277,12 +277,12 @@ async fn transaction_responder_side() {
 
     let entry_1 = Entry {
         size_in_bytes: TRANSACTION_1.len(),
-        transaction: Tx::read(&TRANSACTION_1[..]).unwrap(),
+        transaction: Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap(),
     };
 
     let entry_2 = Entry {
         size_in_bytes: TRANSACTION_2.len(),
-        transaction: Tx::read(&TRANSACTION_2[..]).unwrap(),
+        transaction: Testnet1Transaction::read_le(&TRANSACTION_2[..]).unwrap(),
     };
 
     memory_pool.insert(&storage, entry_1).await.unwrap().unwrap();
@@ -308,7 +308,7 @@ async fn transaction_responder_side() {
 #[tokio::test]
 async fn transaction_two_node() {
     use snarkos_consensus::memory_pool::Entry;
-    use snarkvm_dpc::testnet1::instantiated::Tx;
+    use snarkvm_dpc::testnet1::instantiated::Testnet1Transaction;
     use snarkvm_utilities::bytes::FromBytes;
 
     let node_alice = test_node(TestSetup::default()).await;
@@ -318,7 +318,7 @@ async fn transaction_two_node() {
     let memory_pool = node_alice.expect_sync().memory_pool();
     let storage = node_alice.expect_sync().storage();
 
-    let transaction = Tx::read(&TRANSACTION_1[..]).unwrap();
+    let transaction = Testnet1Transaction::read_le(&TRANSACTION_1[..]).unwrap();
     let size = TRANSACTION_1.len();
     let entry = Entry {
         size_in_bytes: size,

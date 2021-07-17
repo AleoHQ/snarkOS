@@ -63,7 +63,7 @@ impl<T: TransactionScheme + Send + Sync, P: LoadableMerkleParameters, S: Storage
             .try_for_each::<_, Result<(), StorageError>>(|(block_hash_bytes, block_header_bytes)| {
                 if !canon_hashes.contains(&block_hash_bytes) {
                     let block_hash = BlockHeaderHash::new(block_hash_bytes.to_vec());
-                    let block_header = BlockHeader::read(&block_header_bytes[..])?;
+                    let block_header = BlockHeader::read_le(&block_header_bytes[..])?;
 
                     trace!("Block {} is obsolete, staging its objects for removal", block_hash);
 

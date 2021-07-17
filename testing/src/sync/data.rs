@@ -23,7 +23,7 @@ use snarkvm_dpc::{
 use snarkvm_parameters::traits::genesis::Genesis;
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use once_cell::sync::Lazy;
@@ -34,14 +34,14 @@ pub static DATA: Lazy<TestData> = Lazy::new(load_test_data);
 
 pub static GENESIS_BLOCK_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| genesis().header.get_hash().0);
 
-pub static BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_1].unwrap());
+pub static BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_1].unwrap());
 pub static BLOCK_1_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block_1.header.get_hash().0);
 
-pub static BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_2].unwrap());
+pub static BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_2].unwrap());
 pub static BLOCK_2_HEADER_HASH: Lazy<[u8; 32]> = Lazy::new(|| DATA.block_2.header.get_hash().0);
 
-pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_1.transactions.0[0]].unwrap());
-pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes![DATA.block_2.transactions.0[0]].unwrap());
+pub static TRANSACTION_1: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_1.transactions.0[0]].unwrap());
+pub static TRANSACTION_2: Lazy<Vec<u8>> = Lazy::new(|| to_bytes_le![DATA.block_2.transactions.0[0]].unwrap());
 
 // Alternative blocks used for testing syncs and rollbacks
 pub static ALTERNATIVE_BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| {
@@ -50,7 +50,7 @@ pub static ALTERNATIVE_BLOCK_1: Lazy<Vec<u8>> = Lazy::new(|| {
         transactions: DATA.block_1.transactions.clone(),
     };
 
-    to_bytes![alternative_block_1].unwrap()
+    to_bytes_le![alternative_block_1].unwrap()
 });
 
 pub static ALTERNATIVE_BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| {
@@ -59,18 +59,18 @@ pub static ALTERNATIVE_BLOCK_2: Lazy<Vec<u8>> = Lazy::new(|| {
         transactions: DATA.block_2.transactions.clone(),
     };
 
-    to_bytes![alternative_block_2].unwrap()
+    to_bytes_le![alternative_block_2].unwrap()
 });
 
-pub fn genesis() -> Block<Tx> {
-    let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
+pub fn genesis() -> Block<Testnet1Transaction> {
+    let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
 
     genesis_block
 }
 
 pub struct TestData {
-    pub block_1: Block<Tx>,
-    pub block_2: Block<Tx>,
+    pub block_1: Block<Testnet1Transaction>,
+    pub block_2: Block<Testnet1Transaction>,
     pub records_1: Vec<DPCRecord<Components>>,
     pub records_2: Vec<DPCRecord<Components>>,
     pub alternative_block_1_header: BlockHeader,
@@ -79,42 +79,42 @@ pub struct TestData {
 
 impl ToBytes for TestData {
     #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.block_1.write(&mut writer)?;
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.block_1.write_le(&mut writer)?;
 
-        self.block_2.write(&mut writer)?;
+        self.block_2.write_le(&mut writer)?;
 
         writer.write_all(&(self.records_1.len() as u64).to_le_bytes())?;
-        self.records_1.write(&mut writer)?;
+        self.records_1.write_le(&mut writer)?;
 
         writer.write_all(&(self.records_2.len() as u64).to_le_bytes())?;
-        self.records_2.write(&mut writer)?;
+        self.records_2.write_le(&mut writer)?;
 
-        self.alternative_block_1_header.write(&mut writer)?;
-        self.alternative_block_2_header.write(&mut writer)?;
+        self.alternative_block_1_header.write_le(&mut writer)?;
+        self.alternative_block_2_header.write_le(&mut writer)?;
 
         Ok(())
     }
 }
 
 impl FromBytes for TestData {
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let block_1: Block<Tx> = FromBytes::read(&mut reader)?;
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let block_1: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
 
-        let block_2: Block<Tx> = FromBytes::read(&mut reader)?;
+        let block_2: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
 
-        let len = u64::read(&mut reader)? as usize;
+        let len = u64::read_le(&mut reader)? as usize;
         let records_1 = (0..len)
-            .map(|_| FromBytes::read(&mut reader))
+            .map(|_| FromBytes::read_le(&mut reader))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let len = u64::read(&mut reader)? as usize;
+        let len = u64::read_le(&mut reader)? as usize;
         let records_2 = (0..len)
-            .map(|_| FromBytes::read(&mut reader))
+            .map(|_| FromBytes::read_le(&mut reader))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let alternative_block_1_header: BlockHeader = FromBytes::read(&mut reader)?;
-        let alternative_block_2_header: BlockHeader = FromBytes::read(&mut reader)?;
+        let alternative_block_1_header: BlockHeader = FromBytes::read_le(&mut reader)?;
+        let alternative_block_2_header: BlockHeader = FromBytes::read_le(&mut reader)?;
 
         Ok(Self {
             block_1,
@@ -128,45 +128,45 @@ impl FromBytes for TestData {
 }
 
 fn load_test_data() -> TestData {
-    TestData::read(&include_bytes!("test_data")[..]).unwrap()
+    TestData::read_le(&include_bytes!("test_data")[..]).unwrap()
 }
 
 #[derive(Debug)]
-pub struct TestBlocks(pub Vec<Block<Tx>>);
+pub struct TestBlocks(pub Vec<Block<Testnet1Transaction>>);
 
 impl TestBlocks {
-    pub fn new(blocks: Vec<Block<Tx>>) -> Self {
+    pub fn new(blocks: Vec<Block<Testnet1Transaction>>) -> Self {
         TestBlocks(blocks)
     }
 
     pub fn load(count: Option<usize>, batch_name: &str) -> Self {
         let blocks_path = format!("{}/src/sync/{}", env!("CARGO_MANIFEST_DIR"), batch_name);
         let blocks_bytes = std::fs::read(&blocks_path).unwrap();
-        TestBlocks::read(&*blocks_bytes, count).unwrap()
+        TestBlocks::read_le(&*blocks_bytes, count).unwrap()
     }
 
-    pub fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
+    pub fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         for block in &self.0 {
             // Clone is necessary here, otherwise weird things happen.
             let block = block.clone();
-            block.write(&mut writer)?;
+            block.write_le(&mut writer)?;
         }
 
         Ok(())
     }
 
-    pub fn read<R: Read>(mut reader: R, count: Option<usize>) -> IoResult<Self> {
+    pub fn read_le<R: Read>(mut reader: R, count: Option<usize>) -> IoResult<Self> {
         let mut blocks = Vec::new();
 
         if let Some(count) = count {
             blocks.reserve(count);
 
             for _ in 0..count {
-                let block: Block<Tx> = FromBytes::read(&mut reader)?;
+                let block: Block<Testnet1Transaction> = FromBytes::read_le(&mut reader)?;
                 blocks.push(block);
             }
         } else {
-            while let Ok(block) = FromBytes::read(&mut reader) {
+            while let Ok(block) = FromBytes::read_le(&mut reader) {
                 blocks.push(block);
             }
         }

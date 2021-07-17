@@ -22,36 +22,30 @@ mod miner {
         encryption::EncryptionScheme,
         signature::SignatureScheme,
     };
-    use snarkvm_dpc::{
-        block::Transactions as DPCTransactions,
-        AccountAddress,
-        AccountPrivateKey,
-        BlockHeader,
-        DPCComponents,
-    };
+    use snarkvm_dpc::{block::Transactions, Address, BlockHeader, DPCComponents, PrivateKey};
     use snarkvm_posw::txids_to_roots;
 
-    use rand::{Rng, SeedableRng};
-    use rand_xorshift::XorShiftRng;
+    use rand::{CryptoRng, Rng, SeedableRng};
+    use rand_chacha::ChaChaRng;
 
     use std::sync::Arc;
 
-    fn keygen<C: DPCComponents, R: Rng>(rng: &mut R) -> (AccountPrivateKey<C>, AccountAddress<C>) {
+    fn keygen<C: DPCComponents, R: Rng + CryptoRng>(rng: &mut R) -> (PrivateKey<C>, Address<C>) {
         let sig_params = C::AccountSignature::setup(rng).unwrap();
         let comm_params = C::AccountCommitment::setup(rng);
         let enc_params = <C::AccountEncryption as EncryptionScheme>::setup(rng);
 
-        let private_key = AccountPrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
-        let address = AccountAddress::from_private_key(&sig_params, &comm_params, &enc_params, &private_key).unwrap();
+        let private_key = PrivateKey::<C>::new(&sig_params, &comm_params, rng).unwrap();
+        let address = Address::from_private_key(&sig_params, &comm_params, &enc_params, &private_key).unwrap();
 
         (private_key, address)
     }
 
     // this test ensures that a block is found by running the proof of work
     // and that it doesnt loop forever
-    fn test_find_block(transactions: &DPCTransactions<TestTx>, parent_header: &BlockHeader) {
+    fn test_find_block(transactions: &Transactions<TestTestnet1Transaction>, parent_header: &BlockHeader) {
         let consensus = Arc::new(snarkos_testing::sync::create_test_consensus());
-        let mut rng = XorShiftRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
+        let mut rng = ChaChaRng::seed_from_u64(3); // use this rng so that a valid solution is found quickly
 
         let (_, miner_address) = keygen(&mut rng);
         let miner = Miner::new(miner_address, consensus.clone());
@@ -70,7 +64,7 @@ mod miner {
 
     #[tokio::test]
     async fn find_valid_block() {
-        let transactions = DPCTransactions(vec![TestTx; 3]);
+        let transactions = Transactions(vec![TestTestnet1Transaction; 3]);
         let parent_header = genesis().header;
         test_find_block(&transactions, &parent_header);
     }

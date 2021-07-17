@@ -57,36 +57,3 @@ jobs:
         with:
           command: clippy
           args: --workspace --all-targets
-
-  test-wasm:
-    name: WASM Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-
-      - name: Install Rust (stable)
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          target: wasm32-unknown-unknown
-          override: true
-
-      - uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock') }}
-
-      - uses: jetli/wasm-pack-action@v0.3.0
-        with:
-          version: 'latest'
-
-      - name: Test
-        run: |
-          cd toolkit
-          wasm-pack test --node
-#          cargo test --target wasm32-unknown-unknown --features wasm

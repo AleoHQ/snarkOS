@@ -27,7 +27,7 @@ use snarkvm_dpc::{
     StorageError,
     TransactionScheme,
 };
-use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes};
+use snarkvm_utilities::{bytes::ToBytes, has_duplicates, to_bytes_le};
 
 use std::sync::atomic::Ordering;
 
@@ -48,7 +48,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let mut cms = Vec::with_capacity(new_commitments.len());
 
         for sn in old_serial_numbers {
-            let sn_bytes = to_bytes![sn]?;
+            let sn_bytes = to_bytes_le![sn]?;
             if self.get_sn_index(&sn_bytes)?.is_some() {
                 return Err(StorageError::ExistingSn(sn_bytes.to_vec()));
             }
@@ -62,7 +62,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         }
 
         for cm in new_commitments {
-            let cm_bytes = to_bytes![cm]?;
+            let cm_bytes = to_bytes_le![cm]?;
             if self.get_cm_index(&cm_bytes)?.is_some() {
                 return Err(StorageError::ExistingCm(cm_bytes.to_vec()));
             }
@@ -77,7 +77,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             *cm_index += 1;
         }
 
-        let memo_bytes = to_bytes![transaction.memorandum()]?;
+        let memo_bytes = to_bytes_le![transaction.memorandum()]?;
         if self.get_memo_index(&memo_bytes)?.is_some() {
             return Err(StorageError::ExistingMemo(memo_bytes.to_vec()));
         } else {
@@ -140,19 +140,19 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             database_transaction.push(Op::Insert {
                 col: COL_TRANSACTION_LOCATION,
                 key: transaction.transaction_id()?.to_vec(),
-                value: to_bytes![transaction_location]?,
+                value: to_bytes_le![transaction_location]?,
             });
         }
 
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_HEADER,
             key: block_hash.0.to_vec(),
-            value: to_bytes![block.header]?,
+            value: to_bytes_le![block.header]?,
         });
         database_transaction.push(Op::Insert {
             col: COL_BLOCK_TRANSACTIONS,
             key: block_hash.0.to_vec(),
-            value: to_bytes![block.transactions]?,
+            value: to_bytes_le![block.transactions]?,
         });
 
         let mut child_hashes = self.get_child_block_hashes(&block.header.previous_block_hash)?;
@@ -230,7 +230,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             database_transaction.push(Op::Insert {
                 col: COL_TRANSACTION_LOCATION,
                 key: transaction.transaction_id()?.to_vec(),
-                value: to_bytes![transaction_location]?,
+                value: to_bytes_le![transaction_location]?,
             });
         }
 
@@ -287,7 +287,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         if is_genesis {
             database_transaction.push(Op::Insert {
                 col: COL_DIGEST,
-                key: to_bytes![self.current_digest()?]?,
+                key: to_bytes_le![self.current_digest()?]?,
                 value: 0u32.to_le_bytes().to_vec(),
             });
         }
@@ -299,13 +299,13 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
 
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
-            key: to_bytes![new_digest]?,
+            key: to_bytes_le![new_digest]?,
             value: new_best_block_number.to_le_bytes().to_vec(),
         });
         database_transaction.push(Op::Insert {
             col: COL_META,
             key: KEY_CURR_DIGEST.as_bytes().to_vec(),
-            value: to_bytes![new_digest]?,
+            value: to_bytes_le![new_digest]?,
         });
 
         self.storage.batch(database_transaction)?;

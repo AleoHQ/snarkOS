@@ -51,17 +51,17 @@ pub struct TransactionLocation {
 
 impl ToBytes for TransactionLocation {
     #[inline]
-    fn write<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.index.write(&mut writer)?;
-        self.block_hash.write(&mut writer)
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.index.write_le(&mut writer)?;
+        self.block_hash.write_le(&mut writer)
     }
 }
 
 impl FromBytes for TransactionLocation {
     #[inline]
-    fn read<R: Read>(mut reader: R) -> IoResult<Self> {
-        let index: u32 = FromBytes::read(&mut reader)?;
-        let block_hash: [u8; 32] = FromBytes::read(&mut reader)?;
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let index: u32 = FromBytes::read_le(&mut reader)?;
+        let block_hash: [u8; 32] = FromBytes::read_le(&mut reader)?;
 
         Ok(Self { index, block_hash })
     }

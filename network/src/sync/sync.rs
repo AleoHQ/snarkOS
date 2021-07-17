@@ -18,10 +18,7 @@ use crate::{Node, State};
 use snarkos_consensus::{ConsensusParameters, MemoryPool, MerkleTreeLedger};
 use snarkos_storage::BlockHeight;
 use snarkvm_dpc::{
-    testnet1::{
-        instantiated::{Components, Tx},
-        parameters::PublicParameters,
-    },
+    testnet1::instantiated::{Testnet1DPC, Testnet1Transaction},
     Storage,
 };
 
@@ -67,7 +64,7 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
 
     /// Returns a reference to the memory pool of this node.
     #[inline]
-    pub fn memory_pool(&self) -> &MemoryPool<Tx> {
+    pub fn memory_pool(&self) -> &MemoryPool<Testnet1Transaction> {
         &self.consensus.memory_pool
     }
 
@@ -79,8 +76,8 @@ impl<S: Storage + core::marker::Sync + Send + 'static> Sync<S> {
 
     /// Returns a reference to the DPC parameters of this node.
     #[inline]
-    pub fn dpc_parameters(&self) -> &PublicParameters<Components> {
-        &self.consensus.public_parameters
+    pub fn dpc_parameters(&self) -> &Testnet1DPC {
+        &self.consensus.dpc
     }
 
     /// Returns `true` if this node is a mining node. Otherwise, returns `false`.

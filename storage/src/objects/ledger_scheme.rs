@@ -20,7 +20,7 @@ use snarkvm_algorithms::{merkle_tree::*, traits::LoadableMerkleParameters};
 use snarkvm_dpc::{Block, LedgerError, LedgerScheme, Storage, TransactionScheme};
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
-    to_bytes,
+    to_bytes_le,
 };
 
 use std::{fs, marker::PhantomData, path::Path, sync::Arc};
@@ -82,34 +82,36 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> LedgerScheme
 
     /// Return a digest of the latest ledger Merkle tree.
     fn digest(&self) -> Option<Self::MerkleTreeDigest> {
-        let digest: Self::MerkleTreeDigest = FromBytes::read(&self.current_digest().unwrap()[..]).unwrap();
+        let digest: Self::MerkleTreeDigest = FromBytes::read_le(&self.current_digest().unwrap()[..]).unwrap();
         Some(digest)
     }
 
     /// Check that st_{ts} is a valid digest for some (past) ledger state.
     fn validate_digest(&self, digest: &Self::MerkleTreeDigest) -> bool {
-        self.storage.exists(COL_DIGEST, &to_bytes![digest].unwrap())
+        self.storage.exists(COL_DIGEST, &to_bytes_le![digest].unwrap())
     }
 
     /// Returns true if the given commitment exists in the ledger.
     fn contains_cm(&self, cm: &Self::Commitment) -> bool {
-        self.storage.exists(COL_COMMITMENT, &to_bytes![cm].unwrap())
+        self.storage.exists(COL_COMMITMENT, &to_bytes_le![cm].unwrap())
     }
 
     /// Returns true if the given serial number exists in the ledger.
     fn contains_sn(&self, sn: &Self::SerialNumber) -> bool {
-        self.storage.exists(COL_SERIAL_NUMBER, &to_bytes![sn].unwrap())
+        self.storage.exists(COL_SERIAL_NUMBER, &to_bytes_le![sn].unwrap())
     }
 
     /// Returns true if the given memo exists in the ledger.
     fn contains_memo(&self, memo: &<Self::Transaction as TransactionScheme>::Memorandum) -> bool {
-        self.storage.exists(COL_MEMO, &to_bytes![memo].unwrap())
+        self.storage.exists(COL_MEMO, &to_bytes_le![memo].unwrap())
     }
 
     /// Returns the Merkle path to the latest ledger digest
     /// for a given commitment, if it exists in the ledger.
     fn prove_cm(&self, cm: &Self::Commitment) -> anyhow::Result<Self::MerklePath> {
-        let cm_index = self.get_cm_index(&to_bytes![cm]?)?.ok_or(LedgerError::InvalidCmIndex)?;
+        let cm_index = self
+            .get_cm_index(&to_bytes_le![cm]?)?
+            .ok_or(LedgerError::InvalidCmIndex)?;
         let result = self.cm_merkle_tree.load().generate_proof(cm_index, cm)?;
 
         Ok(result)

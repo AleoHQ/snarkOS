@@ -25,7 +25,7 @@ use snarkvm_utilities::bytes::FromBytes;
 
 fn merkle_build(c: &mut Criterion) {
     let crh_parameters =
-        <MerkleTreeCRH as CRH>::Parameters::read(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
+        <MerkleTreeCRH as CRH>::Parameters::read_le(&LedgerMerkleTreeParameters::load_bytes().unwrap()[..])
             .expect("read bytes as hash for MerkleParameters in ledger");
     let merkle_tree_hash_parameters = <CommitmentMerkleParameters as MerkleParameters>::H::from(crh_parameters);
     let ledger_merkle_tree_parameters: Arc<CommitmentMerkleParameters> =

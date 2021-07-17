@@ -20,7 +20,7 @@ use snarkvm_dpc::{errors::StorageError, BlockHeaderHash, LedgerScheme, Storage, 
 use snarkvm_utilities::{
     bytes::{FromBytes, ToBytes},
     has_duplicates,
-    to_bytes,
+    to_bytes_le,
 };
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
@@ -28,7 +28,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     pub fn get_transaction_location(&self, transaction_id: &[u8]) -> Result<Option<TransactionLocation>, StorageError> {
         match self.storage.get(COL_TRANSACTION_LOCATION, transaction_id)? {
             Some(transaction_locator) => {
-                let transaction_location = TransactionLocation::read(&transaction_locator[..])?;
+                let transaction_location = TransactionLocation::read_le(&transaction_locator[..])?;
                 Ok(Some(transaction_location))
             }
             None => Ok(None),
@@ -50,7 +50,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     /// Returns a transaction in bytes given a transaction ID.
     pub fn get_transaction_bytes(&self, transaction_id: &[u8]) -> Result<Vec<u8>, StorageError> {
         match self.get_transaction(transaction_id)? {
-            Some(transaction) => Ok(to_bytes![transaction]?),
+            Some(transaction) => Ok(to_bytes_le![transaction]?),
             None => Err(StorageError::InvalidTransactionId(hex::encode(&transaction_id))),
         }
     }

@@ -34,7 +34,6 @@ members = [
   "rpc",
   "storage",
   "testing",
-  "toolkit"
 ]
 
 [lib]
@@ -45,17 +44,17 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [dependencies.snarkvm-algorithms]
-version = "0.5.4"
+version = "0.7.3"
 default-features = false
 
 [dependencies.snarkvm-dpc]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkvm-posw]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkvm-utilities]
-version = "0.5.4"
+version = "0.7.3"
 
 [dependencies.snarkos-consensus]
 path = "./consensus"

@@ -43,7 +43,7 @@ commands:
 jobs:
   rust-stable:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: 2xlarge
     steps:
       - checkout
@@ -78,7 +78,7 @@ jobs:
 
   snarkos-consensus:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -93,7 +93,7 @@ jobs:
 
   snarkos-metrics:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -108,7 +108,7 @@ jobs:
 
   snarkos-network:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -123,7 +123,7 @@ jobs:
 
   snarkos-parameters:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -138,7 +138,7 @@ jobs:
 
   snarkos-profiler:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -153,7 +153,7 @@ jobs:
 
   snarkos-rpc:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -168,7 +168,7 @@ jobs:
 
   snarkos-storage:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -183,7 +183,7 @@ jobs:
 
   snarkos-testing:
     docker:
-      - image: cimg/rust:1.51.0
+      - image: cimg/rust:1.53.0
     resource_class: xlarge
     steps:
       - checkout
@@ -195,21 +195,6 @@ jobs:
           command: cd testing && RUST_MIN_STACK=8388608 cargo test --release
       - clear_environment:
           cache_key: snarkos-testing-cache
-
-  snarkos-toolkit:
-    docker:
-      - image: cimg/rust:1.51.0
-    resource_class: xlarge
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-toolkit-cache
-      - run:
-          name: Build and run tests
-          no_output_timeout: 35m
-          command: cd toolkit && RUST_MIN_STACK=8388608 cargo test
-      - clear_environment:
-          cache_key: snarkos-toolkit-cache
 
 workflows:
   version: 2
@@ -227,4 +212,3 @@ workflows:
       - snarkos-rpc
       - snarkos-storage
       - snarkos-testing
-      - snarkos-toolkit

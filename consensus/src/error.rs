@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm_algorithms::errors::CRHError;
-use snarkvm_dpc::{BlockError, DPCError, StorageError, TransactionError};
+use snarkvm_dpc::{BlockError, DPCError, ProgramError, RecordError, StorageError, TransactionError};
 use snarkvm_posw::error::PoswError;
 
 use std::fmt::Debug;
@@ -27,7 +27,7 @@ pub enum ConsensusError {
     AlreadySpent(Vec<u8>, u32),
 
     #[error("{}", _0)]
-    BlockError(BlockError),
+    BlockError(#[from] BlockError),
 
     #[error("Block is too large: {}. Exceeds {} maximum", _0, _1)]
     BlockTooLarge(usize, usize),
@@ -42,13 +42,13 @@ pub enum ConsensusError {
     Crate(&'static str, String),
 
     #[error("{}", _0)]
-    CRHError(CRHError),
+    CRHError(#[from] CRHError),
 
     #[error("wrong difficulty, expected {0} got {1}")]
     DifficultyMismatch(u64, u64),
 
     #[error("{}", _0)]
-    DPCError(DPCError),
+    DPCError(#[from] DPCError),
 
     #[error("timestamp more than 2 hours into the future {:?} actual {:?}", _0, _1)]
     FuturisticTimestamp(i64, i64),
@@ -90,49 +90,25 @@ pub enum ConsensusError {
     PoswError(#[from] PoswError),
 
     #[error("{}", _0)]
-    StorageError(StorageError),
+    ProgramError(#[from] ProgramError),
+
+    #[error("{}", _0)]
+    RecordError(#[from] RecordError),
+
+    #[error("{}", _0)]
+    StorageError(#[from] StorageError),
 
     #[error("timestamp {:?} is less than parent timestamp {:?}", _0, _1)]
     TimestampInvalid(i64, i64),
 
     #[error("{}", _0)]
-    TransactionError(TransactionError),
+    TransactionError(#[from] TransactionError),
 
     #[error("Transactions are spending more funds than they have available")]
     TransactionOverspending,
 
     #[error("The block is already known")]
     PreExistingBlock,
-}
-
-impl From<BlockError> for ConsensusError {
-    fn from(error: BlockError) -> Self {
-        ConsensusError::BlockError(error)
-    }
-}
-
-impl From<CRHError> for ConsensusError {
-    fn from(error: CRHError) -> Self {
-        ConsensusError::CRHError(error)
-    }
-}
-
-impl From<DPCError> for ConsensusError {
-    fn from(error: DPCError) -> Self {
-        ConsensusError::DPCError(error)
-    }
-}
-
-impl From<StorageError> for ConsensusError {
-    fn from(error: StorageError) -> Self {
-        ConsensusError::StorageError(error)
-    }
-}
-
-impl From<TransactionError> for ConsensusError {
-    fn from(error: TransactionError) -> Self {
-        ConsensusError::TransactionError(error)
-    }
 }
 
 impl From<anyhow::Error> for ConsensusError {

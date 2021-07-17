@@ -21,36 +21,32 @@ use crate::{
 use snarkos_consensus::MerkleTreeLedger;
 use snarkos_parameters::GenesisBlock;
 use snarkos_storage::LedgerStorage;
-use snarkvm_algorithms::CRH;
 use snarkvm_dpc::{
-    testnet1::{instantiated::*, BaseDPCComponents, NoopProgram},
+    testnet1::{instantiated::*, NoopProgram},
     Account,
     Block,
-    DPCScheme,
     Storage,
 };
 use snarkvm_parameters::traits::genesis::Genesis;
-use snarkvm_utilities::{
-    bytes::{FromBytes, ToBytes},
-    to_bytes,
-};
+use snarkvm_utilities::bytes::FromBytes;
 
 use once_cell::sync::Lazy;
 use rand::SeedableRng;
-use rand_xorshift::XorShiftRng;
-use std::sync::Arc;
+use rand_chacha::ChaChaRng;
+use std::{marker::PhantomData, sync::Arc};
 
 pub static FIXTURE: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(false));
 pub static FIXTURE_VK: Lazy<Fixture<LedgerStorage>> = Lazy::new(|| setup(true));
 
 // helper for setting up e2e tests
 pub struct Fixture<S: Storage> {
-    pub parameters: <InstantiatedDPC as DPCScheme<MerkleTreeLedger<S>>>::NetworkParameters,
+    pub dpc: Arc<Testnet1DPC>,
     pub test_accounts: [Account<Components>; 3],
     pub ledger_parameters: Arc<CommitmentMerkleParameters>,
-    pub genesis_block: Block<Tx>,
-    pub program: NoopProgram<Components, <Components as BaseDPCComponents>::NoopProgramSNARK>,
-    pub rng: XorShiftRng,
+    pub genesis_block: Block<Testnet1Transaction>,
+    pub program: NoopProgram<Components>,
+    pub rng: ChaChaRng,
+    _storage: PhantomData<S>,
 }
 
 impl<S: Storage> Fixture<S> {
@@ -60,33 +56,27 @@ impl<S: Storage> Fixture<S> {
 }
 
 fn setup<S: Storage>(verify_only: bool) -> Fixture<S> {
-    let mut rng = XorShiftRng::seed_from_u64(1231275789u64);
+    let mut rng = ChaChaRng::seed_from_u64(1231275789u64);
 
     // Generate or load parameters for the ledger, commitment schemes, and CRH
-    let (ledger_parameters, parameters) = setup_or_load_parameters::<_, S>(verify_only, &mut rng);
+    let (ledger_parameters, dpc) = setup_or_load_parameters::<_, S>(verify_only, &mut rng);
 
     // Generate addresses
-    let test_accounts = generate_test_accounts::<_, S>(&parameters, &mut rng);
+    let test_accounts = generate_test_accounts::<_, S>(&dpc, &mut rng);
 
-    let genesis_block: Block<Tx> = FromBytes::read(GenesisBlock::load_bytes().as_slice()).unwrap();
+    let genesis_block: Block<Testnet1Transaction> = FromBytes::read_le(GenesisBlock::load_bytes().as_slice()).unwrap();
 
-    let program_vk_hash = to_bytes![
-        ProgramVerificationKeyCRH::hash(
-            &parameters.system_parameters.program_verification_key_crh,
-            &to_bytes![parameters.noop_program_snark_parameters().verification_key].unwrap()
-        )
-        .unwrap()
-    ]
-    .unwrap();
+    let program = dpc.noop_program.clone();
 
-    let program = NoopProgram::new(program_vk_hash);
+    let dpc = Arc::new(dpc);
 
     Fixture {
-        parameters,
+        dpc,
         test_accounts,
         ledger_parameters,
         genesis_block,
         program,
         rng,
+        _storage: PhantomData,
     }
 }
