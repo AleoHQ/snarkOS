@@ -293,7 +293,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         }
 
         // Rebuild the new commitment merkle tree
-        self.rebuild_merkle_tree(transaction_cms)?;
+        self.rebuild_merkle_tree(Default::default(), transaction_cms)?;
         let tree = self.cm_merkle_tree.load();
         let new_digest = tree.root();
 

@@ -105,7 +105,11 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     }
 
     /// Build a new commitment merkle tree from the stored commitments
-    pub fn rebuild_merkle_tree(&self, additional_cms: Vec<(T::Commitment, usize)>) -> Result<(), StorageError> {
+    pub fn rebuild_merkle_tree(
+        &self,
+        cms_to_exclude: HashSet<T::Commitment>,
+        additional_cms: Vec<(T::Commitment, usize)>,
+    ) -> Result<(), StorageError> {
         let mut new_cm_and_indices = additional_cms;
 
         let mut old_cm_and_indices = vec![];
@@ -113,7 +117,9 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             let commitment: T::Commitment = FromBytes::read(&commitment_key[..])?;
             let index = bytes_to_u32(&index_value) as usize;
 
-            old_cm_and_indices.push((commitment, index));
+            if !cms_to_exclude.contains(&commitment) {
+                old_cm_and_indices.push((commitment, index));
+            }
         }
 
         old_cm_and_indices.sort_by(|&(_, i), &(_, j)| i.cmp(&j));
@@ -130,11 +136,14 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
     }
 
     /// Rebuild the stored merkle tree with the current stored commitments
-    pub fn update_merkle_tree(&self, new_best_block_number: u32) -> Result<(), StorageError> {
-        self.rebuild_merkle_tree(vec![])?;
+    pub fn update_merkle_tree(
+        &self,
+        new_best_block_number: u32,
+        database_transaction: &mut DatabaseTransaction,
+        cms_to_exclude: HashSet<T::Commitment>,
+    ) -> Result<(), StorageError> {
+        self.rebuild_merkle_tree(cms_to_exclude, vec![])?;
         let new_digest = self.cm_merkle_tree.load().root();
-
-        let mut database_transaction = DatabaseTransaction::new();
 
         database_transaction.push(Op::Insert {
             col: COL_DIGEST,
@@ -147,6 +156,6 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             value: to_bytes![new_digest]?,
         });
 
-        self.storage.batch(database_transaction)
+        Ok(())
     }
 }

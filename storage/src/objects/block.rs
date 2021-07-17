@@ -29,7 +29,7 @@ use snarkvm_dpc::{
 };
 use snarkvm_utilities::{to_bytes, FromBytes, ToBytes};
 
-use std::sync::atomic::Ordering;
+use std::{collections::HashSet, sync::atomic::Ordering};
 
 impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P, S> {
     /// Get the latest block in the chain.
@@ -185,6 +185,10 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
         let mut cm_index = self.current_cm_index()?;
         let mut memo_index = self.current_memo_index()?;
 
+        // Collect the tx commitments that are to be deleted in order to
+        // remove them from new merkle tree when it's rebuilt.
+        let mut cms_to_exclude = HashSet::new();
+
         for transaction in self.get_block_transactions(&block_hash)?.0 {
             for sn in transaction.old_serial_numbers() {
                 database_transaction.push(Op::Delete {
@@ -195,6 +199,8 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             }
 
             for cm in transaction.new_commitments() {
+                cms_to_exclude.insert(cm.clone());
+
                 database_transaction.push(Op::Delete {
                     col: COL_COMMITMENT,
                     key: to_bytes![cm]?,
@@ -231,17 +237,16 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
             col: COL_BLOCK_LOCATOR,
             key: current_block_height.to_le_bytes().to_vec(),
         });
-
         database_transaction.push(Op::Delete {
             col: COL_BLOCK_LOCATOR,
             key: block_hash.0.to_vec(),
         });
 
+        self.update_merkle_tree(new_best_block_number, &mut database_transaction, cms_to_exclude)?;
+
         self.storage.batch(database_transaction)?;
 
         self.current_block_height.fetch_sub(1, Ordering::SeqCst);
-
-        self.update_merkle_tree(new_best_block_number)?;
 
         Ok(block_hash)
     }

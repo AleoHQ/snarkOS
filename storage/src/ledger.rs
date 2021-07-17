@@ -201,7 +201,7 @@ impl<T: TransactionScheme, P: LoadableMerkleParameters, S: Storage> Ledger<T, P,
                 // the secondary instance requires it.
                 if update_merkle_tree {
                     // Update the Merkle tree of the secondary instance.
-                    self.rebuild_merkle_tree(vec![])?;
+                    self.rebuild_merkle_tree(Default::default(), vec![])?;
                 }
             }
         }
