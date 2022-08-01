@@ -212,11 +212,51 @@ impl Node {
             }
         }
 
+        #[cfg(feature = "auto-update")]
+        initialize_auto_updater(server).await;
+
         // Note: Do not move this. The pending await must be here otherwise
         // other snarkOS commands will not exit.
+        #[cfg(not(feature = "auto-update"))]
         std::future::pending::<()>().await;
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "auto-update")]
+async fn initialize_auto_updater<N: Network, E: Environment>(server: Server<N, E>) {
+    let mut auto_updater = crate::AutoUpdater::new().await.expect("Auto-updater failed");
+
+    loop {
+        match auto_updater.check_for_updates().await {
+            Ok(true) => {
+                warn!("[auto-updater]: You are using an outdated version of the snarkOS client! Automatically updating...");
+                if let Err(e) = auto_updater.update_local_repo().await {
+                    error!("[auto-updater]: Couldn't automatically update the local snarkOS repo: {}", e);
+                    continue;
+                }
+
+                server.shut_down().await;
+
+                if let Err(e) = auto_updater.rebuild_local_repo().await {
+                    error!("[auto-updater]: Couldn't automatically rebuild the local snarkOS repo: {}", e);
+                }
+
+                if let Err(e) = auto_updater.restart() {
+                    error!("[auto-updater]: Couldn't automatically restart the node: {}", e);
+                }
+
+                break;
+            }
+            Ok(false) => {
+                debug!("[auto-updater]: You are using an up-to-date version of the snarkOS client.");
+            }
+            Err(e) => {
+                error!("[auto-updater]: Couldn't check the snarkOS repo for updates: {}", e);
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(crate::AUTO_UPDATE_INTERVAL_SECS)).await;
     }
 }
 
