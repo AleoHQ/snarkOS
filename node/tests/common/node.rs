@@ -17,12 +17,14 @@ use snarkos_account::Account;
 use snarkos_node::{Beacon, Client, Prover, Validator};
 use snarkvm::prelude::{store::helpers::memory::ConsensusMemory, Testnet3 as CurrentNetwork};
 
-use std::str::FromStr;
+use std::{net::SocketAddr, str::FromStr};
 
 pub async fn beacon() -> Beacon<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+    let bft_ip: SocketAddr = "127.0.0.1:0".parse().unwrap();
     Beacon::new(
         "127.0.0.1:0".parse().unwrap(),
         None,
+        Some(bft_ip),
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         sample_genesis_block(), // Should load the current network's genesis block.
@@ -58,9 +60,11 @@ pub async fn prover() -> Prover<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
 }
 
 pub async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+    let bft_ip: SocketAddr = "127.0.0.1:0".parse().unwrap();
     Validator::new(
         "127.0.0.1:0".parse().unwrap(),
         None,
+        Some(bft_ip),
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         sample_genesis_block(), // Should load the current network's genesis block.

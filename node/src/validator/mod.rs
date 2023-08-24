@@ -64,9 +64,11 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes a new validator node.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
+        bft_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
@@ -84,7 +86,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             }
         }
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger.clone(), None, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger.clone(), bft_ip, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.

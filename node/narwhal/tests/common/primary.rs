@@ -28,7 +28,7 @@ use snarkos_node_narwhal::{
 use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkvm::prelude::TestRng;
 
-use std::{collections::HashMap, ops::RangeBounds, sync::Arc, time::Duration};
+use std::{collections::HashMap, net::SocketAddr, ops::RangeBounds, sync::Arc, time::Duration};
 
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -117,11 +117,12 @@ impl TestNetwork {
             let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
             let ledger = Arc::new(MockLedgerService::new());
 
+            let bft_ip: SocketAddr = "127.0.0.1:0".parse().unwrap();
             let (primary, bft) = if config.bft {
-                let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
+                let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, Some(bft_ip), None).unwrap();
                 (bft.primary().clone(), Some(bft))
             } else {
-                let primary = Primary::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
+                let primary = Primary::<CurrentNetwork>::new(account, storage, ledger, Some(bft_ip), None).unwrap();
                 (primary, None)
             };
 

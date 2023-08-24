@@ -49,7 +49,9 @@ impl<N: Network> Node<N> {
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?)))
+        Ok(Self::Beacon(Arc::new(
+            Beacon::new(node_ip, rest_ip, None, account, trusted_peers, genesis, cdn, dev).await?,
+        )))
     }
 
     /// Initializes a new validator node.
@@ -63,7 +65,7 @@ impl<N: Network> Node<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
-            Validator::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?,
+            Validator::new(node_ip, rest_ip, None, account, trusted_peers, genesis, cdn, dev).await?,
         )))
     }
 

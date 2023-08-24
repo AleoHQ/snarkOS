@@ -84,7 +84,7 @@ impl Default for Config {
             name: None,
             listener_ip: default_ip(),
             desired_listening_port: None,
-            allow_random_port: true,
+            allow_random_port: false,
             fatal_io_errors: vec![ConnectionReset, ConnectionAborted, BrokenPipe, InvalidData, UnexpectedEof],
             max_connections: 100,
             connection_timeout_ms: 1_000,

@@ -509,6 +509,7 @@ mod tests {
     async fn test_new() {
         let tcp = Tcp::new(Config {
             listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            desired_listening_port: Some(0),
             max_connections: 200,
             ..Default::default()
         });
@@ -523,7 +524,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_connect() {
-        let tcp = Tcp::new(Config::default());
+        let tcp = Tcp::new(Config { desired_listening_port: Some(0), ..Default::default() });
         let node_ip = tcp.enable_listener().await.unwrap();
 
         // Ensure self-connecting is not possible.
@@ -552,7 +553,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disconnect() {
-        let tcp = Tcp::new(Config::default());
+        let tcp = Tcp::new(Config { desired_listening_port: Some(0), ..Default::default() });
         let _node_ip = tcp.enable_listener().await.unwrap();
 
         // Initialize the peer.

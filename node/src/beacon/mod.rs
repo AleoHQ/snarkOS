@@ -70,9 +70,11 @@ pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
 
 impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initializes a new beacon node.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
+        bft_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Block<N>,
@@ -96,7 +98,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         }
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger.clone(), None, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger.clone(), bft_ip, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
@@ -465,6 +467,7 @@ mod tests {
         let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
             node,
             Some(rest),
+            None,
             beacon_account,
             &[],
             genesis,
