@@ -55,6 +55,10 @@ version = "=2.2.7"
 path = "locators"
 version = "=2.2.7"
 
+[dependencies.snarkos-node-router]
+path = "../router"
+version = "=2.2.7"
+
 [dependencies.snarkvm]
 workspace = true
 

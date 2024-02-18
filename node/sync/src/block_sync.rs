@@ -17,6 +17,7 @@ use crate::{
     locators::BlockLocators,
 };
 use snarkos_node_bft_ledger_service::LedgerService;
+use snarkos_node_router::messages::DataBlocks;
 use snarkos_node_sync_communication_service::CommunicationService;
 use snarkos_node_sync_locators::{CHECKPOINT_INTERVAL, NUM_RECENT_BLOCKS};
 use snarkvm::prelude::{block::Block, Network};
@@ -236,30 +237,52 @@ impl<N: Network> BlockSync<N> {
         }
 
         // Process the block requests.
-        'outer: for (height, (hash, previous_hash, sync_ips)) in block_requests {
-            // Insert the block request into the sync pool.
-            if let Err(error) = self.insert_block_request(height, (hash, previous_hash, sync_ips.clone())) {
-                warn!("Block sync failed - {error}");
-                // Break out of the loop.
-                break 'outer;
+        'outer: for requests in block_requests.chunks(DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as usize) {
+            // Get the start height and the sync ips for the first block request.
+            // This unwrap is safe because we know that the chunk is non-empty.
+            let (start_height, (_, _, sync_ips)) = match requests.first() {
+                Some(request) => request.clone(),
+                None => {
+                    warn!("Block sync failed - no block requests");
+                    // Break out of the loop.
+                    break;
+                }
+            };
+
+            // Calculate the end height.
+            let end_height = start_height.saturating_add(requests.len() as u32);
+
+            for (height, (hash, previous_hash, _)) in requests.iter() {
+                // TODO (raychu86): Fix this. We are using the sync peers selected for the first block request and disregarding the ones generated for the other block requests.
+                // Insert the block request into the sync pool.
+                if let Err(error) = self.insert_block_request(*height, (*hash, *previous_hash, sync_ips.clone())) {
+                    warn!("Block sync failed - {error}");
+                    // Break out of the loop.
+                    break 'outer;
+                }
             }
 
             /* Send the block request to the peers */
 
             // Construct the message.
-            let message = C::prepare_block_request(height, height + 1);
+            let message = C::prepare_block_request(start_height, end_height);
+
+            // TODO (raychu86): These sync IPs are not correct. Because we have randomly selected sync IPS for each block request. This needs to be fixed on another level.
             // Send the message to the peers.
             for sync_ip in sync_ips {
                 let sender = communication.send(sync_ip, message.clone()).await;
-                // If the send fails for any peer, remove the block request from the sync pool.
+                // If the send fails for any peer, remove the block requests from the sync pool.
                 if sender.is_none() {
                     warn!("Failed to send block request to peer '{sync_ip}'");
                     // Remove the entire block request from the sync pool.
-                    self.remove_block_request(height);
+                    for height in start_height..end_height {
+                        self.remove_block_request(height);
+                    }
                     // Break out of the loop.
                     break 'outer;
                 }
             }
+
             // Sleep for 10 milliseconds to avoid triggering spam detection.
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }

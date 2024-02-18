@@ -64,7 +64,7 @@ pub struct DataBlocks<N: Network>(pub Vec<Block<N>>);
 
 impl<N: Network> DataBlocks<N> {
     /// The maximum number of blocks that can be sent in a single message.
-    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 1;
+    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 5;
 
     /// Ensures that the blocks are well-formed in a block response.
     pub fn ensure_response_is_well_formed(
