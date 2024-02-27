@@ -26,7 +26,7 @@ use snarkvm::prelude::{
 
 use aleo_std::StorageMode;
 use anyhow::Result;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 
 pub enum Node<N: Network> {
     /// A validator is a full node, capable of validating blocks.
@@ -50,6 +50,7 @@ impl<N: Network> Node<N> {
         genesis: Block<N>,
         cdn: Option<String>,
         storage_mode: StorageMode,
+        dev_tx_interval: Option<Duration>,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
             Validator::new(
@@ -63,6 +64,7 @@ impl<N: Network> Node<N> {
                 genesis,
                 cdn,
                 storage_mode,
+                dev_tx_interval,
             )
             .await?,
         )))

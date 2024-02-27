@@ -38,7 +38,7 @@ use colored::Colorize;
 use core::str::FromStr;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
-use std::{net::SocketAddr, path::PathBuf};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 use tokio::runtime::{self, Runtime};
 
 /// The recommended minimum number of 'open files' limit for a validator.
@@ -124,6 +124,9 @@ pub struct Start {
     /// If development mode is enabled, specify the number of genesis validators (default: 4)
     #[clap(long)]
     pub dev_num_validators: Option<u16>,
+    /// If development mode is enabled, specify the interval of mock transaction generation in milliseconds (default: 500ms if dev=0, None otherwise)
+    #[clap(long)]
+    pub dev_tx_interval_ms: Option<u16>,
     /// Specify the path to a directory containing the ledger
     #[clap(long = "storage_path")]
     pub storage_path: Option<PathBuf>,
@@ -454,8 +457,9 @@ impl Start {
 
         // Initialize the node.
         let bft_ip = if self.dev.is_some() { self.bft } else { None };
+        let dev_tx_interval = self.dev_tx_interval_ms.map(|msec| Duration::from_millis(msec as u64));
         match node_type {
-            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode).await,
+            NodeType::Validator => Node::new_validator(self.node, bft_ip, rest_ip, self.rest_rps, account, &trusted_peers, &trusted_validators, genesis, cdn, storage_mode, dev_tx_interval).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, storage_mode).await,
             NodeType::Client => Node::new_client(self.node, rest_ip, self.rest_rps, account, &trusted_peers, genesis, cdn, storage_mode).await,
         }
