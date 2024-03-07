@@ -64,7 +64,8 @@ async fn handshake_responder_side_timeout() {
     /* Don't send any further messages and wait for the gateway to timeout. */
 
     // Check the connection has been registered.
-    assert_eq!(gateway.tcp().num_connecting(), 1);
+    let gateway_clone = gateway.clone();
+    deadline!(Duration::from_secs(1), move || gateway_clone.tcp().num_connecting() == 1);
 
     // Check the tcp stack's connection counts, wait longer than the gateway's timeout to ensure
     // connecting peers are cleared.
@@ -94,7 +95,8 @@ macro_rules! handshake_responder_side_unexpected_event {
                 assert!(test_peer.connect(gateway.local_ip()).await.is_ok());
 
                 // Check the connection has been registered.
-                assert_eq!(gateway.tcp().num_connecting(), 1);
+                let gateway_clone = gateway.clone();
+                deadline!(Duration::from_secs(1), move || gateway_clone.tcp().num_connecting() == 1);
 
                 // Send an unexpected event.
                 let _ = test_peer.unicast(
@@ -161,7 +163,8 @@ async fn handshake_responder_side_invalid_challenge_request() {
     assert!(test_peer.connect(gateway.local_ip()).await.is_ok());
 
     // Check the connection has been registered.
-    assert_eq!(gateway.tcp().num_connecting(), 1);
+    let gateway_clone = gateway.clone();
+    deadline!(Duration::from_secs(1), move || gateway_clone.tcp().num_connecting() == 1);
 
     // Use the address from the second peer in the list, the test peer will use the first.
     let listener_port = test_peer.listening_addr().port();
@@ -200,7 +203,8 @@ async fn handshake_responder_side_invalid_challenge_response() {
     assert!(test_peer.connect(gateway.local_ip()).await.is_ok());
 
     // Check the connection has been registered.
-    assert_eq!(gateway.tcp().num_connecting(), 1);
+    let gateway_clone = gateway.clone();
+    deadline!(Duration::from_secs(1), move || gateway_clone.tcp().num_connecting() == 1);
 
     // Use the address from the second peer in the list, the test peer will use the first.
     let listener_port = test_peer.listening_addr().port();
