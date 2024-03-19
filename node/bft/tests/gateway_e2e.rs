@@ -15,37 +15,38 @@
 #[allow(dead_code)]
 mod common;
 
-use crate::common::{primary::new_test_committee, test_peer::TestPeer, CurrentNetwork};
+use crate::common::{
+    primary::new_test_committee,
+    test_peer::TestPeer,
+    utils::{sample_gateway, sample_ledger, sample_storage},
+    CurrentNetwork,
+};
 use snarkos_account::Account;
 use snarkos_node_bft::{helpers::init_primary_channels, Gateway};
 use snarkos_node_bft_events::{ChallengeRequest, ChallengeResponse, Disconnect, DisconnectReason, Event, WorkerPing};
-use snarkos_node_bft_ledger_service::MockLedgerService;
 use snarkos_node_tcp::P2P;
-use snarkvm::{
-    ledger::{committee::Committee, narwhal::Data},
-    prelude::TestRng,
-};
+use snarkvm::{ledger::narwhal::Data, prelude::TestRng};
 
-use std::{net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
+use std::time::Duration;
 
 use deadline::deadline;
 use rand::Rng;
 
 async fn new_test_gateway(
-    accounts: &[Account<CurrentNetwork>],
-    committee: &Committee<CurrentNetwork>,
-) -> Gateway<CurrentNetwork> {
-    let ledger = Arc::new(MockLedgerService::new(committee.clone()));
-    let addr = SocketAddr::from_str("127.0.0.1:0").ok();
-    let trusted_validators = [];
-    let gateway = Gateway::new(accounts.first().unwrap().clone(), ledger, addr, &trusted_validators, None).unwrap();
+    num_nodes: u16,
+    rng: &mut TestRng,
+) -> (Vec<Account<CurrentNetwork>>, Gateway<CurrentNetwork>) {
+    let (accounts, committee) = new_test_committee(num_nodes, rng);
+    let ledger = sample_ledger(&accounts, &committee, rng);
+    let storage = sample_storage(ledger.clone());
+    let gateway = sample_gateway(accounts[0].clone(), storage, ledger);
 
     // Set up primary channels, we discard the rx as we're testing the gateway sans BFT.
     let (primary_tx, _primary_rx) = init_primary_channels();
 
     gateway.run(primary_tx, [].into(), None).await;
 
-    gateway
+    (accounts, gateway)
 }
 
 // The test peer connects to the gateway and completes the no-op handshake (so
@@ -53,8 +54,9 @@ async fn new_test_gateway(
 #[tokio::test(flavor = "multi_thread")]
 async fn handshake_responder_side_timeout() {
     const NUM_NODES: u16 = 4;
-    let (accounts, committee) = new_test_committee(NUM_NODES);
-    let gateway = new_test_gateway(&accounts, &committee).await;
+
+    let mut rng = TestRng::default();
+    let (_accounts, gateway) = new_test_gateway(NUM_NODES, &mut rng).await;
     let test_peer = TestPeer::new().await;
 
     // Initiate a connection with the gateway, this will only return once the handshake protocol has
@@ -86,8 +88,9 @@ macro_rules! handshake_responder_side_unexpected_event {
             #[tokio::test(flavor = "multi_thread")]
             async fn [<handshake_responder_side_unexpected_ $test_name>]() {
                 const NUM_NODES: u16 = 4;
-                let (accounts, committee) = new_test_committee(NUM_NODES);
-                let gateway = new_test_gateway(&accounts, &committee).await;
+
+                let mut rng = TestRng::default();
+                let (_accounts, gateway) = new_test_gateway(NUM_NODES, &mut rng).await;
                 let test_peer = TestPeer::new().await;
 
                 // Initiate a connection with the gateway, this will only return once the handshake protocol has
@@ -154,8 +157,7 @@ async fn handshake_responder_side_invalid_challenge_request() {
     const NUM_NODES: u16 = 4;
 
     let mut rng = TestRng::default();
-    let (accounts, committee) = new_test_committee(NUM_NODES);
-    let gateway = new_test_gateway(&accounts, &committee).await;
+    let (accounts, gateway) = new_test_gateway(NUM_NODES, &mut rng).await;
     let test_peer = TestPeer::new().await;
 
     // Initiate a connection with the gateway, this will only return once the handshake protocol has
@@ -194,8 +196,7 @@ async fn handshake_responder_side_invalid_challenge_response() {
     const NUM_NODES: u16 = 4;
 
     let mut rng = TestRng::default();
-    let (accounts, committee) = new_test_committee(NUM_NODES);
-    let gateway = new_test_gateway(&accounts, &committee).await;
+    let (accounts, gateway) = new_test_gateway(NUM_NODES, &mut rng).await;
     let mut test_peer = TestPeer::new().await;
 
     // Initiate a connection with the gateway, this will only return once the handshake protocol has

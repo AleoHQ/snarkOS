@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    common::CurrentNetwork,
-    components::{sample_ledger, sample_worker},
+use crate::common::{
+    primary::new_test_committee,
+    utils::{sample_ledger, sample_worker},
+    CurrentNetwork,
 };
 use snarkos_node_bft::helpers::max_redundant_requests;
 use snarkvm::{
@@ -30,11 +31,13 @@ async fn test_resend_transmission_request() {
     const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
 
     // Initialize the RNG.
-    let rng = &mut TestRng::default();
+    let mut rng = TestRng::default();
+    // Initialize the accounts and the committee.
+    let (accounts, committee) = new_test_committee(NUM_NODES, &mut rng);
     // Sample a ledger.
-    let ledger = sample_ledger(NUM_NODES, rng);
+    let ledger = sample_ledger(&accounts, &committee, &mut rng);
     // Sample a worker.
-    let worker = sample_worker(0, ledger.clone());
+    let worker = sample_worker(0, accounts[0].clone(), ledger.clone());
 
     // Determine the maximum number of redundant requests.
     let max_redundancy = max_redundant_requests(ledger.clone(), 0);
@@ -89,11 +92,13 @@ async fn test_flood_transmission_requests() {
     const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
 
     // Initialize the RNG.
-    let rng = &mut TestRng::default();
+    let mut rng = TestRng::default();
+    // Initialize the accounts and the committee.
+    let (accounts, committee) = new_test_committee(NUM_NODES, &mut rng);
     // Sample a ledger.
-    let ledger = sample_ledger(NUM_NODES, rng);
+    let ledger = sample_ledger(&accounts, &committee, &mut rng);
     // Sample a worker.
-    let worker = sample_worker(0, ledger.clone());
+    let worker = sample_worker(0, accounts[0].clone(), ledger.clone());
 
     // Determine the maximum number of redundant requests.
     let max_redundancy = max_redundant_requests(ledger.clone(), 0);

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{common::CurrentNetwork, components::sample_ledger};
+use crate::common::{primary::new_test_committee, utils::sample_ledger, CurrentNetwork};
 use snarkos_node_bft::helpers::max_redundant_requests;
 use snarkvm::{ledger::committee::Committee, prelude::TestRng};
 
@@ -21,9 +21,11 @@ fn test_max_redundant_requests() {
     const NUM_NODES: u16 = Committee::<CurrentNetwork>::MAX_COMMITTEE_SIZE;
 
     // Initialize the RNG.
-    let rng = &mut TestRng::default();
+    let mut rng = TestRng::default();
+    // Initialize the accounts and the committee.
+    let (accounts, committee) = new_test_committee(NUM_NODES, &mut rng);
     // Sample a ledger.
-    let ledger = sample_ledger(NUM_NODES, rng);
+    let ledger = sample_ledger(&accounts, &committee, &mut rng);
     // Ensure the maximum number of redundant requests is correct and consistent across iterations.
     assert_eq!(max_redundant_requests(ledger, 0), 34, "Update me if the formula changes");
 }
