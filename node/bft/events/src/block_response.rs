@@ -136,22 +136,52 @@ impl<N: Network> FromBytes for DataBlocks<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{block_request::prop_tests::any_block_request, BlockResponse, DataBlocks};
-    use snarkvm::{
-        ledger::ledger_test_helpers::sample_genesis_block,
-        prelude::{block::Block, narwhal::Data, FromBytes, TestRng, ToBytes},
-    };
+    use anyhow::Context;
+    use snarkvm::prelude::{block::Block, narwhal::Data, FromBytes, TestRng, ToBytes};
+    use std::{env, fs::DirBuilder};
 
     use bytes::{Buf, BufMut, BytesMut};
+    use once_cell::sync::OnceCell;
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Strategy},
     };
+    use snarkvm::{
+        ledger::store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        prelude::{PrivateKey, VM},
+    };
+    use tempfile::tempdir_in;
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
+    fn sample_genesis_block(rng: &mut TestRng) -> Block<CurrentNetwork> {
+        // TODO refactor me to a single location in codebase
+        static INSTANCE: OnceCell<Block<CurrentNetwork>> = OnceCell::new();
+        INSTANCE
+            .get_or_init(|| {
+                // Sample the genesis private key.
+                let private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
+
+                // Initialize the store in temp dir inside aleo-test specific tmp dir.
+                let aleo_tmp_dir = env::temp_dir().join("aleo_tmp_SAFE_TO_DELETE/");
+                if aleo_tmp_dir.exists() {
+                    std::fs::remove_dir_all(aleo_tmp_dir.clone())
+                        .with_context(|| format!("Cannot remove {aleo_tmp_dir:?}"))
+                        .unwrap();
+                };
+                DirBuilder::new().recursive(true).create(aleo_tmp_dir.clone()).unwrap();
+                let temp_dir = tempdir_in(aleo_tmp_dir).unwrap();
+                let store = ConsensusStore::<_, ConsensusMemory<_>>::open(temp_dir.into_path()).unwrap();
+
+                // Create a genesis block.
+                VM::from(store).unwrap().genesis_beacon(&private_key, rng).unwrap()
+            })
+            .clone()
+    }
+
     pub fn any_block() -> BoxedStrategy<Block<CurrentNetwork>> {
-        any::<u64>().prop_map(|seed| sample_genesis_block(&mut TestRng::fixed(seed))).boxed()
+        any::<u64>().prop_map(|seed| sample_genesis_block(&mut TestRng::from_seed(seed))).boxed()
     }
 
     pub fn any_data_blocks() -> BoxedStrategy<DataBlocks<CurrentNetwork>> {

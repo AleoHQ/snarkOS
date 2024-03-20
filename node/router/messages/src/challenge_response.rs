@@ -59,11 +59,12 @@ pub mod prop_tests {
     use crate::ChallengeResponse;
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
-        ledger::{ledger_test_helpers::sample_genesis_block, narwhal::Data},
+        ledger::narwhal::Data,
         prelude::{block::Header, PrivateKey, Signature},
         utilities::rand::{TestRng, Uniform},
     };
 
+    use crate::block_response::prop_tests;
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
@@ -71,9 +72,9 @@ pub mod prop_tests {
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
 
     pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
-        (0..64)
-            .prop_map(|message_size| {
-                let rng = &mut TestRng::default();
+        (any::<u64>(), 0..64)
+            .prop_map(|(seed, message_size)| {
+                let rng = &mut TestRng::from_seed(seed);
                 let message: Vec<_> = (0..message_size).map(|_| Uniform::rand(rng)).collect();
                 let private_key = PrivateKey::new(rng).unwrap();
                 Signature::sign(&private_key, &message, rng).unwrap()
@@ -82,7 +83,7 @@ pub mod prop_tests {
     }
 
     pub fn any_genesis_header() -> BoxedStrategy<Header<CurrentNetwork>> {
-        any::<u64>().prop_map(|seed| *sample_genesis_block(&mut TestRng::fixed(seed)).header()).boxed()
+        any::<u64>().prop_map(|seed| *prop_tests::sample_genesis_block(&mut TestRng::from_seed(seed)).header()).boxed()
     }
 
     pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {

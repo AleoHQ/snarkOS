@@ -72,3 +72,9 @@ version = "0.3"
 [dev-dependencies.snarkos-node-sync-locators]
 path = "../../sync/locators"
 features = [ "test" ]
+
+[dev-dependencies.tempfile]
+version = "3.10.1"
+
+[dev-dependencies.once_cell]
+version = "1.18"
