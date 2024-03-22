@@ -356,6 +356,18 @@ impl<N: Network> Worker<N> {
     fn start_handlers(&self, receiver: WorkerReceiver<N>) {
         let WorkerReceiver { mut rx_worker_ping, mut rx_transmission_request, mut rx_transmission_response } = receiver;
 
+        // Start the pending queue expiration loop.
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                // Sleep briefly.
+                tokio::time::sleep(Duration::from_millis(MAX_FETCH_TIMEOUT_IN_MS)).await;
+
+                // Remove the expired pending certificate requests.
+                self_.pending.clear_expired_callbacks();
+            }
+        });
+
         // Process the ping events.
         let self_ = self.clone();
         self.spawn(async move {
@@ -430,7 +442,7 @@ impl<N: Network> Worker<N> {
     fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) {
         let TransmissionResponse { transmission_id, mut transmission } = response;
         // Check if the peer IP exists in the pending queue for the given transmission ID.
-        let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
+        let exists = self.pending.get_peers(transmission_id).unwrap_or_default().contains(&peer_ip);
         // If the peer IP exists, finish the pending request.
         if exists {
             // Ensure the transmission is not a fee and matches the transmission ID.
