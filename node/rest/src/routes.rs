@@ -313,6 +313,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Json(tx): Json<Transaction<N>>,
     ) -> Result<ErasedJson, RestError> {
+        // Check if the transaction is well-formed.
+        rest.ledger
+            .check_transaction_basic(&tx, None, &mut rand::thread_rng())
+            .map_err(|e| RestError(format!("Invalid transaction: {e}")))?;
+
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
