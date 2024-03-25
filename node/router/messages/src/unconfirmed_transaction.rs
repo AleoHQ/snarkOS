@@ -60,7 +60,7 @@ impl<N: Network> FromBytes for UnconfirmedTransaction<N> {
 pub mod prop_tests {
     use crate::{Transaction, UnconfirmedTransaction};
     use snarkvm::{
-        ledger::{narwhal::Data},
+        ledger::narwhal::Data,
         prelude::{FromBytes, ToBytes},
     };
 
@@ -70,7 +70,7 @@ pub mod prop_tests {
         prelude::{any, BoxedStrategy, Strategy},
         sample::Selector,
     };
-    
+
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::MainnetV0;
