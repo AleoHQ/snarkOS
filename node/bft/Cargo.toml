@@ -138,7 +138,7 @@ version = "5"
 version = "1"
 
 [dev-dependencies.pea2pea]
- version = "0.46"
+ version = "0.49"
 
 [dev-dependencies.proptest]
 version = "1.4.0"

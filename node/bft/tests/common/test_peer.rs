@@ -22,7 +22,7 @@ use std::{
 };
 
 use pea2pea::{
-    protocols::{Disconnect, Handshake, Reading, Writing},
+    protocols::{Handshake, OnDisconnect, Reading, Writing},
     Config,
     Connection,
     ConnectionSide,
@@ -54,8 +54,8 @@ impl TestPeer {
         let (tx, rx) = mpsc::channel(100);
         let inner_node = InnerNode {
             node: Node::new(Config {
-                listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
                 max_connections: 200,
+                listener_addr: Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)),
                 ..Default::default()
             }),
             inbound_tx: tx,
@@ -107,7 +107,6 @@ impl Pea2Pea for InnerNode {
     }
 }
 
-#[async_trait::async_trait]
 impl Handshake for InnerNode {
     // Set the timeout on the test peer to be longer than the gateway's timeout.
     const TIMEOUT_MS: u64 = 10_000;
@@ -118,7 +117,6 @@ impl Handshake for InnerNode {
     }
 }
 
-#[async_trait::async_trait]
 impl Writing for InnerNode {
     type Codec = EventCodec<CurrentNetwork>;
     type Message = Event<CurrentNetwork>;
@@ -128,7 +126,6 @@ impl Writing for InnerNode {
     }
 }
 
-#[async_trait::async_trait]
 impl Reading for InnerNode {
     type Codec = EventCodec<CurrentNetwork>;
     type Message = Event<CurrentNetwork>;
@@ -144,7 +141,6 @@ impl Reading for InnerNode {
     }
 }
 
-#[async_trait::async_trait]
-impl Disconnect for InnerNode {
-    async fn handle_disconnect(&self, _peer_addr: SocketAddr) {}
+impl OnDisconnect for InnerNode {
+    async fn on_disconnect(&self, _peer_addr: SocketAddr) {}
 }

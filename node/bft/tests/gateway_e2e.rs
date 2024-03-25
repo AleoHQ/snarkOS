@@ -59,6 +59,8 @@ async fn handshake_responder_side_timeout() {
     let (_accounts, gateway) = new_test_gateway(NUM_NODES, &mut rng).await;
     let test_peer = TestPeer::new().await;
 
+    dbg!(test_peer.listening_addr());
+
     // Initiate a connection with the gateway, this will only return once the handshake protocol has
     // completed on the test peer's side, which is a no-op.
     assert!(test_peer.connect(gateway.local_ip()).await.is_ok());
