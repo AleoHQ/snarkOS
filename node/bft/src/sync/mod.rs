@@ -379,6 +379,11 @@ impl<N: Network> Sync<N> {
         self.block_sync.is_block_synced()
     }
 
+    /// Returns the number of blocks the node is behind the greatest peer height.
+    pub fn num_blocks_behind(&self) -> u32 {
+        self.block_sync.num_blocks_behind()
+    }
+
     /// Returns `true` if the node is in gateway mode.
     pub const fn is_gateway_mode(&self) -> bool {
         self.block_sync.mode().is_gateway()
