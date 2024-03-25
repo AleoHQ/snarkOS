@@ -293,25 +293,28 @@ impl<N: Network> Primary<N> {
             // Construct the event.
             // TODO(ljedrz): the BatchHeader should be serialized only once in advance before being sent to non-signers.
             let event = Event::BatchPropose(proposal.batch_header().clone().into());
-            // Iterate through the non-signers.
-            for address in proposal.nonsigners(&self.ledger.get_committee_lookback_for_round(proposal.round())?) {
-                // Resolve the address to the peer IP.
-                match self.gateway.resolver().get_peer_ip_for_address(address) {
-                    // Resend the batch proposal to the validator for signing.
-                    Some(peer_ip) => {
-                        let (gateway, event_, round) = (self.gateway.clone(), event.clone(), proposal.round());
-                        tokio::spawn(async move {
-                            debug!("Resending batch proposal for round {round} to peer '{peer_ip}'");
-                            // Resend the batch proposal to the peer.
-                            if gateway.send(peer_ip, event_).await.is_none() {
-                                warn!("Failed to resend batch proposal for round {round} to peer '{peer_ip}'");
-                            }
-                        });
+
+            // Collect all non_signers into `Vec` to avoid logging and spawning tasks in a loop.
+            let non_signers: Vec<SocketAddr> = proposal
+                .nonsigners(&self.ledger.get_committee_lookback_for_round(proposal.round())?)
+                .iter()
+                .filter_map(|address| self.gateway.resolver().get_peer_ip_for_address(*address))
+                .collect();
+
+            debug!(
+                "Proposed batch for round {} is still valid, resending to {} peers: '{non_signers:?}'",
+                proposal.round(),
+                non_signers.len()
+            );
+            for non_signer in non_signers {
+                let (gateway, event, round) = (self.gateway.clone(), event.clone(), proposal.round());
+                tokio::spawn(async move {
+                    // Resend the batch proposal to the peer.
+                    if gateway.send(non_signer, event).await.is_none() {
+                        warn!("Failed to resend batch proposal for round {round} to peer '{non_signer}'");
                     }
-                    None => continue,
-                }
+                });
             }
-            debug!("Proposed batch for round {} is still valid", proposal.round());
             return Ok(());
         }
 
