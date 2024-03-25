@@ -14,7 +14,7 @@
 
 use crate::{
     events::{EventCodec, PrimaryPing},
-    helpers::{assign_to_worker, Cache, PrimarySender, Resolver, SyncSender, WorkerSender},
+    helpers::{assign_to_worker, PeerCache, PrimarySender, Resolver, SyncSender, WorkerSender},
     spawn_blocking,
     CONTEXT,
     MAX_BATCH_DELAY_IN_MS,
@@ -104,7 +104,7 @@ pub struct Gateway<N: Network> {
     /// The TCP stack.
     tcp: Tcp,
     /// The cache.
-    cache: Arc<Cache<N>>,
+    cache: Arc<PeerCache<N>>,
     /// The resolver.
     resolver: Arc<Resolver<N>>,
     /// The set of trusted validators.

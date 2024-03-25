@@ -23,7 +23,7 @@ use std::{
 use time::OffsetDateTime;
 
 #[derive(Debug)]
-pub struct Cache<N: Network> {
+pub struct PeerCache<N: Network> {
     /// The ordered timestamp map of peer connections and cache hits.
     seen_inbound_connections: RwLock<BTreeMap<i64, HashMap<IpAddr, u32>>>,
     /// The ordered timestamp map of peer IPs and cache hits.
@@ -42,14 +42,14 @@ pub struct Cache<N: Network> {
     seen_outbound_validators_requests: RwLock<HashMap<SocketAddr, u32>>,
 }
 
-impl<N: Network> Default for Cache<N> {
+impl<N: Network> Default for PeerCache<N> {
     /// Initializes a new instance of the cache.
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<N: Network> Cache<N> {
+impl<N: Network> PeerCache<N> {
     /// Initializes a new instance of the cache.
     pub fn new() -> Self {
         Self {
@@ -65,7 +65,7 @@ impl<N: Network> Cache<N> {
     }
 }
 
-impl<N: Network> Cache<N> {
+impl<N: Network> PeerCache<N> {
     /// Inserts a new timestamp for the given peer connection, returning the number of recent connection requests.
     pub fn insert_inbound_connection(&self, peer_ip: IpAddr, interval_in_secs: i64) -> usize {
         Self::retain_and_insert(&self.seen_inbound_connections, peer_ip, interval_in_secs)
@@ -87,7 +87,7 @@ impl<N: Network> Cache<N> {
     }
 }
 
-impl<N: Network> Cache<N> {
+impl<N: Network> PeerCache<N> {
     /// Inserts a new timestamp for the given peer, returning the number of recent events.
     pub fn insert_outbound_event(&self, peer_ip: SocketAddr, interval_in_secs: i64) -> usize {
         Self::retain_and_insert(&self.seen_outbound_events, peer_ip, interval_in_secs)
@@ -104,7 +104,7 @@ impl<N: Network> Cache<N> {
     }
 }
 
-impl<N: Network> Cache<N> {
+impl<N: Network> PeerCache<N> {
     /// Returns `true` if the cache contains a validators request from the given IP.
     pub fn contains_outbound_validators_request(&self, peer_ip: SocketAddr) -> bool {
         self.seen_outbound_validators_requests.read().get(&peer_ip).map(|r| *r > 0).unwrap_or(false)
@@ -121,7 +121,7 @@ impl<N: Network> Cache<N> {
     }
 }
 
-impl<N: Network> Cache<N> {
+impl<N: Network> PeerCache<N> {
     /// Insert a new timestamp for the given key, returning the number of recent entries.
     fn retain_and_insert<K: Copy + Clone + PartialEq + Eq + Hash>(
         map: &RwLock<BTreeMap<i64, HashMap<K, u32>>>,
@@ -233,7 +233,7 @@ mod tests {
                 paste::paste! {
                     #[test]
                     fn [<test_seen_ $name s>]() {
-                        let cache = Cache::<CurrentNetwork>::default();
+                        let cache = PeerCache::<CurrentNetwork>::default();
                         let input = Input::input();
 
                         // Check that the cache is empty.
