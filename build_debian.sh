@@ -4,23 +4,20 @@ echo " Attention - Building snarkOS from source code."
 echo " This will request root permissions with sudo."
 echo "================================================"
 
-# Install Ubuntu dependencies
+# Install Debian dependencies
 
 sudo apt-get update
 sudo apt-get install -y \
 	build-essential \
 	curl \
-	clang \
 	gcc \
 	libssl-dev \
-	llvm \
 	make \
 	pkg-config \
         sudo \
 	tmux \
 	xz-utils \
 	ufw
-
 
 # Install Rust
 
@@ -41,3 +38,4 @@ echo ""
 echo " Home Users - Enable port forwarding or NAT rules"
 echo "              for 4133 and 3033 on your router."
 echo "=================================================="
+

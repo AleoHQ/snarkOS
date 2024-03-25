@@ -82,17 +82,31 @@ Next, move into the `snarkOS` directory:
 cd snarkOS
 ```
 
-**[For Ubuntu users]** A helper script to install dependencies is available. From the `snarkOS` directory, run:
-```
-./build_ubuntu.sh
-```
-
 Lastly, install `snarkOS`:
 ```
 cargo install --locked --path .
 ```
 
 Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+
+**[For Ubuntu users]** A helper script to install dependencies is available. From the `snarkOS` directory, run:
+```
+./build_ubuntu.sh
+```
+
+
+**[For Debian users]** 
+
+Firstly, install the most recent versions of LLVM and Clang.
+Download the official install script from here (https://apt.llvm.org/llvm.sh) and then run:
+```
+./llvm.sh
+```
+
+A helper script to install dependencies is available. From the `snarkOS` directory, run:
+```
+./build_debian.sh
+```
 
 ## 3. Run an Aleo Node
 
