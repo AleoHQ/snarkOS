@@ -305,6 +305,11 @@ impl<N: Network> Router<N> {
         self.connected_peers.read().len()
     }
 
+    /// Returns the number of connecting peers.
+    pub fn number_of_connecting_peers(&self) -> usize {
+        self.connecting_peers.lock().len()
+    }
+
     /// Returns the number of connected validators.
     pub fn number_of_connected_validators(&self) -> usize {
         self.connected_peers.read().values().filter(|peer| peer.is_validator()).count()
@@ -477,6 +482,11 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().insert(peer_ip);
         #[cfg(feature = "metrics")]
         self.update_metrics();
+    }
+
+    /// Removes the connecting peer.
+    pub fn remove_connecting_peer(&self, peer_ip: SocketAddr) {
+        self.connecting_peers.lock().remove(&peer_ip);
     }
 
     #[cfg(feature = "test")]

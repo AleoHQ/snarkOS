@@ -404,15 +404,17 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Ensure the peer is allowed to connect.
-    fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr) -> Result<()> {
+    fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr) -> Result<ConnectingPeer<'_, N>> {
         // Ensure the peer IP is not this node.
         if self.is_local_ip(peer_ip) {
             bail!("{CONTEXT} Dropping connection request from '{peer_ip}' (attempted to self-connect)")
         }
         // Ensure the node is not already connecting to this peer.
-        if !self.connecting_peers.lock().insert(peer_ip) {
+        let connecting_peer = if !self.connecting_peers.lock().insert(peer_ip) {
             bail!("{CONTEXT} Dropping connection request from '{peer_ip}' (already shaking hands as the initiator)")
-        }
+        } else {
+            ConnectingPeer::new(peer_ip, self)
+        };
         // Ensure the node is not already connected to this peer.
         if self.is_connected_ip(peer_ip) {
             bail!("{CONTEXT} Dropping connection request from '{peer_ip}' (already connected)")
@@ -426,7 +428,7 @@ impl<N: Network> Gateway<N> {
                 bail!("Dropping connection request from '{peer_ip}' (tried {num_attempts} times)")
             }
         }
-        Ok(())
+        Ok(connecting_peer)
     }
 
     #[cfg(feature = "metrics")]
@@ -473,6 +475,10 @@ impl<N: Network> Gateway<N> {
         self.connected_peers.write().shift_remove(&peer_ip);
         #[cfg(feature = "metrics")]
         self.update_metrics();
+    }
+
+    pub fn remove_connecting_peer(&self, peer_ip: SocketAddr) {
+        self.connecting_peers.lock().remove(&peer_ip);
     }
 
     /// Sends the given event to specified peer.
@@ -1145,6 +1151,29 @@ async fn send_event<N: Network>(
     framed.send(event).await
 }
 
+/// This object is a self-destruct wrapper that removes a peer from the list of
+/// connecting entities in case the handshake is broken due to a timeout; this is
+/// only needed when the node responds to a peer's connection request.
+struct ConnectingPeer<'a, N: Network> {
+    ip: SocketAddr,
+    router: &'a Gateway<N>,
+    connected: bool,
+}
+
+impl<'a, N: Network> ConnectingPeer<'a, N> {
+    fn new(ip: SocketAddr, router: &'a Gateway<N>) -> Self {
+        Self { ip, router, connected: false }
+    }
+}
+
+impl<'a, N: Network> Drop for ConnectingPeer<'a, N> {
+    fn drop(&mut self) {
+        if !self.connected {
+            self.router.remove_connecting_peer(self.ip);
+        }
+    }
+}
+
 impl<N: Network> Gateway<N> {
     /// The connection initiator side of the handshake.
     async fn handshake_inner_initiator<'a>(
@@ -1233,9 +1262,10 @@ impl<N: Network> Gateway<N> {
         let peer_ip = peer_ip.unwrap();
 
         // Knowing the peer's listening address, ensure it is allowed to connect.
-        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip) {
-            return Err(error(format!("{forbidden_message}")));
-        }
+        let mut connecting_peer = match self.ensure_peer_is_allowed(peer_ip) {
+            Ok(peer) => peer,
+            Err(forbidden_message) => return Err(error(format!("{forbidden_message}"))),
+        };
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
             send_event(&mut framed, peer_addr, reason.into()).await?;
@@ -1276,6 +1306,8 @@ impl<N: Network> Gateway<N> {
         }
         // Add the peer to the gateway.
         self.insert_connected_peer(peer_ip, peer_addr, peer_request.address);
+
+        connecting_peer.connected = true;
 
         Ok((peer_ip, framed))
     }
