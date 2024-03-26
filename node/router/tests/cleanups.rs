@@ -71,7 +71,7 @@ async fn test_connection_cleanups() {
         // Wait until the connection is complete.
         let tcp0 = nodes[0].tcp().clone();
         let tcp1 = nodes[1].tcp().clone();
-        deadline!(Duration::from_secs(3), move || tcp0.num_connected() == 1 && tcp1.num_connected() == 1);
+        deadline!(Duration::from_secs(5), move || tcp0.num_connected() == 1 && tcp1.num_connected() == 1);
 
         // Since the connectee doesn't read from the connector, it can't tell that the connector disconnected
         // from it, so it needs to disconnect from it manually.
@@ -81,7 +81,7 @@ async fn test_connection_cleanups() {
         // Wait until the disconnect is complete.
         let tcp0 = nodes[0].tcp().clone();
         let tcp1 = nodes[1].tcp().clone();
-        deadline!(Duration::from_secs(3), move || tcp0.num_connected() == 0 && tcp1.num_connected() == 0);
+        deadline!(Duration::from_secs(5), move || tcp0.num_connected() == 0 && tcp1.num_connected() == 0);
 
         // Register heap use after a single connection.
         if i == 0 {

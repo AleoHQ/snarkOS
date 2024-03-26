@@ -30,7 +30,7 @@ use std::{
 
 use futures_util::{sink::SinkExt, TryStreamExt};
 use pea2pea::{
-    protocols::{Disconnect, Handshake, Reading, Writing},
+    protocols::{Handshake, OnDisconnect, Reading, Writing},
     Config,
     Connection,
     ConnectionSide,
@@ -82,8 +82,8 @@ impl TestPeer {
     pub async fn new(node_type: NodeType, account: Account<CurrentNetwork>) -> Self {
         let peer = Self {
             node: Node::new(Config {
-                listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
                 max_connections: 200,
+                listener_addr: Some(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)),
                 ..Default::default()
             }),
             node_type,
@@ -113,7 +113,6 @@ impl TestPeer {
     }
 }
 
-#[async_trait::async_trait]
 impl Handshake for TestPeer {
     async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
         let rng = &mut TestRng::default();
@@ -174,7 +173,6 @@ impl Handshake for TestPeer {
     }
 }
 
-#[async_trait::async_trait]
 impl Writing for TestPeer {
     type Codec = MessageCodec<CurrentNetwork>;
     type Message = Message<CurrentNetwork>;
@@ -184,7 +182,6 @@ impl Writing for TestPeer {
     }
 }
 
-#[async_trait::async_trait]
 impl Reading for TestPeer {
     type Codec = MessageCodec<CurrentNetwork>;
     type Message = Message<CurrentNetwork>;
@@ -198,7 +195,6 @@ impl Reading for TestPeer {
     }
 }
 
-#[async_trait::async_trait]
-impl Disconnect for TestPeer {
-    async fn handle_disconnect(&self, _peer_addr: SocketAddr) {}
+impl OnDisconnect for TestPeer {
+    async fn on_disconnect(&self, _peer_addr: SocketAddr) {}
 }

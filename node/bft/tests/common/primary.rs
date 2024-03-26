@@ -127,11 +127,13 @@ impl TestValidator {
 impl TestNetwork {
     // Creates a new test network with the given configuration.
     pub fn new(config: TestNetworkConfig) -> Self {
+        let mut rng = TestRng::default();
+
         if let Some(log_level) = config.log_level {
             initialize_logger(log_level);
         }
 
-        let (accounts, committee) = new_test_committee(config.num_nodes);
+        let (accounts, committee) = new_test_committee(config.num_nodes, &mut rng);
         let bonded_balances: IndexMap<_, _> = committee
             .members()
             .iter()
@@ -148,7 +150,6 @@ impl TestNetwork {
 
         let mut validators = HashMap::with_capacity(config.num_nodes as usize);
         for (id, account) in accounts.into_iter().enumerate() {
-            let mut rng = TestRng::fixed(id as u64);
             let gen_ledger =
                 genesis_ledger(gen_key, committee.clone(), balances.clone(), bonded_balances.clone(), &mut rng);
             let ledger = Arc::new(TranslucentLedgerService::new(gen_ledger, Default::default()));
@@ -329,12 +330,12 @@ impl TestNetwork {
 }
 
 // Initializes a new test committee.
-pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
+pub fn new_test_committee(n: u16, rng: &mut TestRng) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
     let mut accounts = Vec::with_capacity(n as usize);
     let mut members = IndexMap::with_capacity(n as usize);
     for i in 0..n {
         // Sample the account.
-        let account = Account::new(&mut TestRng::fixed(i as u64)).unwrap();
+        let account = Account::new(rng).unwrap();
         info!("Validator {}: {}", i, account.address());
 
         members.insert(account.address(), (MIN_VALIDATOR_STAKE, false));
