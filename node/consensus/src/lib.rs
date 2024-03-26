@@ -48,6 +48,8 @@ use colored::Colorize;
 use indexmap::IndexMap;
 use lru::LruCache;
 use parking_lot::Mutex;
+#[cfg(feature = "metrics")]
+use std::collections::HashMap;
 use std::{future::Future, net::SocketAddr, num::NonZeroUsize, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
@@ -100,6 +102,8 @@ pub struct Consensus<N: Network> {
     seen_transactions: Arc<Mutex<LruCache<N::TransactionID, ()>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    #[cfg(feature = "metrics")]
+    transmissions_queue_timestamps: Arc<Mutex<HashMap<TransmissionID<N>, i64>>>,
 }
 
 impl<N: Network> Consensus<N> {
@@ -132,6 +136,8 @@ impl<N: Network> Consensus<N> {
             seen_solutions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             seen_transactions: Arc::new(Mutex::new(LruCache::new(NonZeroUsize::new(1 << 16).unwrap()))),
             handles: Default::default(),
+            #[cfg(feature = "metrics")]
+            transmissions_queue_timestamps: Default::default(),
         })
     }
 
@@ -217,6 +223,8 @@ impl<N: Network> Consensus<N> {
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_SOLUTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+            let timestamp = snarkos_node_bft::helpers::now();
+            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Solution(solution.id()), timestamp);
         }
         // Process the unconfirmed solution.
         {
@@ -278,6 +286,8 @@ impl<N: Network> Consensus<N> {
         {
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSACTIONS, 1f64);
             metrics::increment_gauge(metrics::consensus::UNCONFIRMED_TRANSMISSIONS, 1f64);
+            let timestamp = snarkos_node_bft::helpers::now();
+            self.transmissions_queue_timestamps.lock().insert(TransmissionID::Transaction(transaction.id()), timestamp);
         }
         // Process the unconfirmed transaction.
         {
@@ -423,6 +433,8 @@ impl<N: Network> Consensus<N> {
             let num_tx = next_block.transactions().len();
             let num_transmissions = num_tx + num_sol;
 
+            self.add_transmission_latency_metric(&next_block);
+
             metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
             metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
             metrics::increment_gauge(metrics::blocks::TRANSACTIONS, num_tx as f64);
@@ -433,6 +445,51 @@ impl<N: Network> Consensus<N> {
             metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
         }
         Ok(())
+    }
+
+    #[cfg(feature = "metrics")]
+    fn add_transmission_latency_metric(&self, next_block: &Block<N>) {
+        const AGE_THRESHOLD_SECONDS: i32 = 30 * 60; // 30 minutes set as stale transmission threshold
+
+        let mut keys_to_remove = Vec::new();
+
+        let solution_ids: std::collections::HashSet<_> = next_block.solutions().solution_ids().collect();
+        let transaction_ids: std::collections::HashSet<_> = next_block.transaction_ids().collect();
+
+        let mut transmission_queue_timestamps = self.transmissions_queue_timestamps.lock();
+        let ts_now = snarkos_node_bft::helpers::now();
+        for (key, timestamp) in transmission_queue_timestamps.iter() {
+            let elapsed_time = std::time::Duration::from_secs((ts_now - *timestamp) as u64);
+
+            if elapsed_time.as_secs() > AGE_THRESHOLD_SECONDS as u64 {
+                // This entry is stale-- remove it from transmission queue and record it as a stale transmission.
+                metrics::increment_counter(metrics::consensus::STALE_UNCONFIRMED_TRANSMISSIONS);
+                keys_to_remove.push(*key);
+            } else {
+                let transmission_type = match key {
+                    TransmissionID::Solution(solution_id) if solution_ids.contains(solution_id) => Some("solution"),
+                    TransmissionID::Transaction(transaction_id) if transaction_ids.contains(transaction_id) => {
+                        Some("transaction")
+                    }
+                    _ => None,
+                };
+
+                if let Some(transmission_type_string) = transmission_type {
+                    metrics::histogram_label(
+                        metrics::consensus::TRANSMISSION_LATENCY,
+                        "transmission_type",
+                        transmission_type_string.to_owned(),
+                        elapsed_time.as_secs_f64(),
+                    );
+                    keys_to_remove.push(*key);
+                }
+            }
+        }
+
+        // Remove keys of stale or seen transmissions
+        for key in keys_to_remove {
+            transmission_queue_timestamps.remove(&key);
+        }
     }
 
     /// Reinserts the given transmissions into the memory pool.

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub(super) const COUNTER_NAMES: [&str; 1] = [bft::LEADERS_ELECTED];
+pub(super) const COUNTER_NAMES: [&str; 2] = [bft::LEADERS_ELECTED, consensus::STALE_UNCONFIRMED_TRANSMISSIONS];
 
 pub(super) const GAUGE_NAMES: [&str; 18] = [
     bft::CONNECTED,
@@ -35,10 +35,11 @@ pub(super) const GAUGE_NAMES: [&str; 18] = [
     tcp::TCP_TASKS,
 ];
 
-pub(super) const HISTOGRAM_NAMES: [&str; 7] = [
+pub(super) const HISTOGRAM_NAMES: [&str; 8] = [
     bft::COMMIT_ROUNDS_LATENCY,
     consensus::CERTIFICATE_COMMIT_LATENCY,
     consensus::BLOCK_LATENCY,
+    consensus::TRANSMISSION_LATENCY,
     tcp::NOISE_CODEC_ENCRYPTION_TIME,
     tcp::NOISE_CODEC_DECRYPTION_TIME,
     tcp::NOISE_CODEC_ENCRYPTION_SIZE,
@@ -70,6 +71,8 @@ pub mod consensus {
     pub const UNCONFIRMED_TRANSACTIONS: &str = "snarkos_consensus_unconfirmed_transactions_total";
     pub const UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_unconfirmed_transmissions_total";
     pub const UNCONFIRMED_SOLUTIONS: &str = "snarkos_consensus_unconfirmed_solutions_total";
+    pub const TRANSMISSION_LATENCY: &str = "snarkos_consensus_transmission_latency";
+    pub const STALE_UNCONFIRMED_TRANSMISSIONS: &str = "snarkos_consensus_stale_unconfirmed_transmissions";
 }
 
 pub mod router {
