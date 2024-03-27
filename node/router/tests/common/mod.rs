@@ -111,7 +111,7 @@ pub async fn validator(listening_port: u16, max_peers: u16) -> TestRouter<Curren
         sample_account(),
         &[],
         max_peers,
-        false,
+        true, // Router tests require validators to connect to peers.
         true,
     )
     .await
