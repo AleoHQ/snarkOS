@@ -14,7 +14,7 @@
 
 pub(super) const COUNTER_NAMES: [&str; 1] = [bft::LEADERS_ELECTED];
 
-pub(super) const GAUGE_NAMES: [&str; 18] = [
+pub(super) const GAUGE_NAMES: [&str; 21] = [
     bft::CONNECTED,
     bft::CONNECTING,
     bft::LAST_STORED_ROUND,
@@ -24,6 +24,9 @@ pub(super) const GAUGE_NAMES: [&str; 18] = [
     blocks::SOLUTIONS,
     blocks::TRANSACTIONS,
     blocks::TRANSMISSIONS,
+    blocks::PROOF_TARGET,
+    blocks::COINBASE_TARGET,
+    blocks::CUMULATIVE_PROOF_TARGET,
     consensus::COMMITTED_CERTIFICATES,
     consensus::LAST_COMMITTED_ROUND,
     consensus::UNCONFIRMED_SOLUTIONS,
@@ -60,6 +63,9 @@ pub mod blocks {
     pub const TRANSACTIONS: &str = "snarkos_blocks_transactions_total";
     pub const TRANSMISSIONS: &str = "snarkos_blocks_transmissions_total";
     pub const SOLUTIONS: &str = "snarkos_blocks_solutions_total";
+    pub const PROOF_TARGET: &str = "snarkos_blocks_proof_target";
+    pub const COINBASE_TARGET: &str = "snarkos_blocks_coinbase_target";
+    pub const CUMULATIVE_PROOF_TARGET: &str = "snarkos_blocks_cumulative_proof_target";
 }
 
 pub mod consensus {

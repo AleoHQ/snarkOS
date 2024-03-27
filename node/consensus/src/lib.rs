@@ -422,6 +422,9 @@ impl<N: Network> Consensus<N> {
             let num_sol = next_block.solutions().len();
             let num_tx = next_block.transactions().len();
             let num_transmissions = num_tx + num_sol;
+            let proof_target = next_block.header().proof_target();
+            let coinbase_target = next_block.header().coinbase_target();
+            let cumulative_proof_target = next_block.header().cumulative_proof_target();
 
             metrics::gauge(metrics::blocks::HEIGHT, next_block.height() as f64);
             metrics::increment_gauge(metrics::blocks::SOLUTIONS, num_sol as f64);
@@ -431,6 +434,9 @@ impl<N: Network> Consensus<N> {
             metrics::gauge(metrics::consensus::COMMITTED_CERTIFICATES, num_committed_certificates as f64);
             metrics::histogram(metrics::consensus::CERTIFICATE_COMMIT_LATENCY, elapsed.as_secs_f64());
             metrics::histogram(metrics::consensus::BLOCK_LATENCY, block_latency as f64);
+            metrics::gauge(metrics::blocks::PROOF_TARGET, proof_target as f64);
+            metrics::gauge(metrics::blocks::COINBASE_TARGET, coinbase_target as f64);
+            metrics::gauge(metrics::blocks::CUMULATIVE_PROOF_TARGET, cumulative_proof_target as f64);
         }
         Ok(())
     }
