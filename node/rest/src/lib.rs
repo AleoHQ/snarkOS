@@ -36,18 +36,21 @@ use snarkvm::{
 use anyhow::Result;
 use axum::{
     body::Body,
+    error_handling::HandleErrorLayer,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
     http::{header::CONTENT_TYPE, Method, Request, StatusCode},
     middleware,
     middleware::Next,
     response::Response,
     routing::{get, post},
+    BoxError,
     Json,
 };
 use axum_extra::response::ErasedJson;
 use parking_lot::Mutex;
-use std::{net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, task::JoinHandle};
+use tower::{buffer::BufferLayer, limit::RateLimitLayer, ServiceBuilder};
 use tower_governor::{governor::GovernorConfigBuilder, GovernorLayer};
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -116,6 +119,18 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                 .finish()
                 .expect("Couldn't set up rate limiting for the REST server!"),
         );
+
+        let global_rate_limiter = ServiceBuilder::new()
+            .layer(HandleErrorLayer::new(|err: BoxError| async move {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Unhandled error: {}", err),
+                )
+            }))
+            // Use a buffer layer to allow rate limiting.
+            .layer(BufferLayer::new(1024))
+            // Apply a global rate limit of 100 requests/s.
+            .layer(RateLimitLayer::new(100, Duration::from_secs(1)));
 
         let router = {
             axum::Router::new()
@@ -197,6 +212,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
                 // We can leak this because it is created only once and it persists.
                 config: Box::leak(governor_config),
             })
+            .layer(global_rate_limiter)
         };
 
         let rest_listener = TcpListener::bind(rest_ip).await.unwrap();

@@ -81,6 +81,7 @@ version = "1"
 
 [dependencies.tower]
 version = "0.4"
+features = ["buffer", "limit"]
 
 [dependencies.tower_governor]
 version = "0.3"
