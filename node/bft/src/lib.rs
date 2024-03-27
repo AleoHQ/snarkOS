@@ -49,6 +49,8 @@ pub const MEMORY_POOL_PORT: u16 = 5000; // port
 
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY_IN_MS: u64 = 2500; // ms
+/// The minimum number of seconds to wait before proposing a batch.
+pub const MIN_BATCH_DELAY_IN_SECS: u64 = 1; // seconds
 /// The maximum number of milliseconds to wait before timing out on a fetch.
 pub const MAX_FETCH_TIMEOUT_IN_MS: u64 = 3 * MAX_BATCH_DELAY_IN_MS; // ms
 /// The maximum number of seconds allowed for the leader to send their certificate.
